@@ -1,0 +1,33 @@
+{
+  "name": "TrucoPaulista",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Events": {
+        "$className": "Folder",
+        "DealCards": { "$className": "RemoteEvent" },
+        "GameStatusEvent": { "$className": "RemoteEvent" },
+        "RequestAction": { "$className": "RemoteEvent" },
+        "PlayCardEvent": { "$className": "RemoteEvent" },
+        "UpdateTurnEvent": { "$className": "RemoteEvent" },
+        "CardPlayedOnTable": { "$className": "RemoteEvent" },
+        "TrucoEvent": { "$className": "RemoteEvent" },
+        "SignalEvent": { "$className": "RemoteEvent" }
+      },
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$path": "src/server"
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}
