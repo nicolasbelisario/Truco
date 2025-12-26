@@ -1,4 +1,3 @@
--- src/shared/GameConfig.luau
 local GameConfig = {
     MAX_PLAYERS = 4,
     COUNTDOWN_TIME = 5,
