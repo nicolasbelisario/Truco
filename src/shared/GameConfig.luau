@@ -1,8 +1,9 @@
 local GameConfig = {
     MAX_PLAYERS = 4,
     COUNTDOWN_TIME = 5,
-    CUT_TIME_LIMIT = 10, -- 10 segundos para cortar
+    CUT_TIME_LIMIT = 10, -- Tempo para o jogador realizar o corte
 
+    -- Estados da máquina de estados do jogo
     States = {
         WAITING = "WAITING",
         COUNTDOWN = "COUNTDOWN",
@@ -12,7 +13,7 @@ local GameConfig = {
         PLAYING = "PLAYING",
     },
 
-    -- Nomes para exibição na UI
+    -- Mensagens visuais para o cliente
     StateDisplayNames = {
         WAITING = "Aguardando jogadores...",
         COUNTDOWN = "O jogo começa em:",
@@ -22,6 +23,7 @@ local GameConfig = {
         PLAYING = "Partida em andamento",
     },
 
+    -- Definição das duplas baseada nos índices das cadeiras
     TEAMS = { TeamA = {1, 3}, TeamB = {2, 4} }
 }
 

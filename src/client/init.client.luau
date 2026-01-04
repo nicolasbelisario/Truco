@@ -16,13 +16,16 @@ local function updateSitStatus(isSitting)
         if char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
             local seatName = char.Humanoid.SeatPart.Parent.Name
             UIManager.SetMySeat(seatName)
-            -- Define o time: Cadeiras 1 e 3 são Time A, 2 e 4 são Time B
+            
+            -- Cadeiras 1 e 3 (Ímpares) = Time A
+            -- Cadeiras 2 e 4 (Pares) = Time B
             local seatNum = tonumber(seatName:match("%d+"))
             myTeam = (seatNum % 2 == 1) and "A" or "B"
         end
     end
 end
 
+-- Listener de sentar/levantar
 player.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid")
     hum:GetPropertyChangedSignal("Sit"):Connect(function() updateSitStatus(hum.Sit) end)
@@ -32,19 +35,19 @@ if player.Character and player.Character:FindFirstChild("Humanoid") then
     updateSitStatus(player.Character.Humanoid.Sit)
 end
 
--- LISTENERS ÚNICOS
+-- RECEBIMENTO DE AÇÕES DO SERVIDOR (Corte e Desafios)
 Events.RequestAction.OnClientEvent:Connect(function(actionType, data)
     if actionType == "EscolhaOCorte" then 
         UIManager.ShowCutOptions(data) 
     elseif actionType == "TrucoChallenge" then
-        -- 'data' contém {Value = 3, Caller = "Nome"}
+        -- data: {Value, Caller, NextRaise}
         UIManager.ShowTrucoChallenge(data.Value, data.Caller)
     end
 end)
 
--- Substitua o listener do GameStatusEvent por este:
+-- GERENCIADOR PRINCIPAL DE ESTADO
 Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
-    -- 1. VERIFICAÇÕES TÉCNICAS E ESTADOS
+    -- 1. Controle de Botão de Truco
     if message == "HIDE_TRUCO_BTN" then
         UIManager.SetCanTruco(false)
         return
@@ -52,19 +55,17 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         UIManager.SetCanTruco(true)
         return
     elseif message == "DEALING" then
-        if UIManager.HideCutMenu then 
-            UIManager.HideCutMenu() 
-        end
+        UIManager.HideCutMenu()
         return
-    end -- <--- O 'END' QUE FALTAVA ESTÁ AQUI
-
-    -- 2. LIMPEZA E CÂMERA
-    if message == "TRUCO_ACEITO" or message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
-        UIManager.HideTrucoChallenge()
-        if UIManager.ResetCamera then UIManager.ResetCamera() end
     end
 
-    -- 3. ESTRUTURA PRINCIPAL
+    -- 2. Limpeza de Interface e Efeitos
+    if message == "TRUCO_ACEITO" or message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
+        UIManager.HideTrucoChallenge()
+        UIManager.ResetCamera()
+    end
+
+    -- 3. Atualizações de Jogo
     if message == "CLEAR_TABLE" then
         local myTricks = (myTeam == "A") and data.TeamA or data.TeamB
         local enemyTricks = (myTeam == "A") and data.TeamB or data.TeamA
@@ -106,6 +107,7 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
     end
 end)
 
+-- DEALER: Recebe mão inicial
 Events.DealCards.OnClientEvent:Connect(function(mao, vira, partner)
     if partner then currentPartner = partner end
     UIManager.ClearHand() 
@@ -126,13 +128,17 @@ Events.CardPlayedOnTable.OnClientEvent:Connect(function(playerName, value, suit)
     UIManager.AddPlayedCardUI(playerName, value, suit)
 end)
 
--- Sinais e Emotes
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.Q then Events.SignalEvent:FireServer("Sinal_Mao")
-    elseif input.KeyCode == Enum.KeyCode.E then Events.SignalEvent:FireServer("Sinal_Olhar") end
-end)
-
 Events.SignalEvent.OnClientEvent:Connect(function(sender, signalType)
     UIManager.ShowSignal(sender, signalType)
+end)
+
+-- CONTROLE DE INPUTS (Sinais e Truco)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    
+    if input.KeyCode == Enum.KeyCode.Q then 
+        Events.SignalEvent:FireServer("Sinal_Mao")
+    elseif input.KeyCode == Enum.KeyCode.E then 
+        Events.SignalEvent:FireServer("Sinal_Olhar") 
+    end
 end)

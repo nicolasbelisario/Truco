@@ -4,29 +4,25 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local GameConfig = require(Shared:WaitForChild("GameConfig"))
 
 local SeatManager = {}
-local playersSeated = {}
-local onSeatedChangeCallback = nil -- Variável para armazenar o aviso ao GameManager
+local playersSeated = {} -- Armazena [NomeCadeira] = Player
+local onSeatedChangeCallback = nil 
 
--- Função interna para travar ou destravar o pulo do jogador
+-- Gerencia a física do pulo (evita que jogadores pulem da cadeira durante o jogo)
 local function setJumpState(character, canJump)
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        if canJump then
-            humanoid.JumpPower = 50 -- Valor padrão do Roblox
-        else
-            humanoid.JumpPower = 0
-        end
+        humanoid.JumpPower = canJump and 50 or 0
     end
 end
 
--- Inicializa o sistema de assentos e aceita uma função de aviso opcional
+-- Inicializa o monitoramento das cadeiras
 function SeatManager.Init(callback)
-    onSeatedChangeCallback = callback -- Define a função que será chamada em mudanças
+    onSeatedChangeCallback = callback
     
     local mesaTruco = workspace:WaitForChild("MesaTruco")
     local pastaCadeiras = mesaTruco:WaitForChild("Cadeiras")
     
-    print("SeatManager: Iniciando busca por cadeiras em " .. pastaCadeiras:GetFullName())
+    print("SeatManager: Monitorando " .. pastaCadeiras:GetFullName())
 
     for _, modeloCadeira in ipairs(pastaCadeiras:GetChildren()) do
         local seat = modeloCadeira:FindFirstChildWhichIsA("Seat")
@@ -34,29 +30,30 @@ function SeatManager.Init(callback)
         if seat then
             seat:GetPropertyChangedSignal("Occupant"):Connect(function()
                 local humanoid = seat.Occupant
+                
                 if humanoid then
+                    -- Jogador sentou
                     local player = game.Players:GetPlayerFromCharacter(humanoid.Parent)
                     if player then
                         playersSeated[modeloCadeira.Name] = player
                         print(player.Name .. " sentou na " .. modeloCadeira.Name)
                         
-                        -- Notifica o servidor para atualizar a UI dos jogadores
                         if onSeatedChangeCallback then onSeatedChangeCallback() end
-                        
                         SeatManager.CheckPlayers()
                     end
                 else
-                    -- Identifica quem saiu da cadeira para restaurar o pulo e limpar a lista
+                    -- Jogador levantou
                     for name, player in pairs(playersSeated) do
                         if name == modeloCadeira.Name then
                             if player.Character then
-                                setJumpState(player.Character, true)
+                                setJumpState(player.Character, true) -- Restaura o pulo
                             end
                             print(player.Name .. " saiu da " .. modeloCadeira.Name)
                             playersSeated[name] = nil
+                            
+                            -- Remove UI de jogo
                             Events.GameStatusEvent:FireClient(player, "HIDE_SCOREBOARD")
                             
-                            -- Notifica o servidor que um jogador saiu
                             if onSeatedChangeCallback then onSeatedChangeCallback() end
                             break
                         end
@@ -67,6 +64,7 @@ function SeatManager.Init(callback)
     end
 end
 
+-- Retorna a contagem e a tabela de jogadores sentados
 function SeatManager.GetSeatedPlayers()
     local count = 0
     for _ in pairs(playersSeated) do count += 1 end
@@ -75,21 +73,15 @@ end
 
 function SeatManager.CheckPlayers()
     local count, _ = SeatManager.GetSeatedPlayers()
-    print("Jogadores na mesa: " .. count .. "/4")
-    
     if count == GameConfig.MAX_PLAYERS then
-        print("MESA CHEIA! Prontos para o Truco.")
+        print("MESA CHEIA! Aguardando início.")
     end
 end
 
--- Trava o pulo do jogador durante a partida
+-- Trava/Destrava movimentação
 function SeatManager.SetJumpLock(player, locked)
-    local character = player.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.JumpPower = locked and 0 or 50
-        end
+    if player and player.Character then
+        setJumpState(player.Character, not locked)
     end
 end
 
