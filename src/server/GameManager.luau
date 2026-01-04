@@ -1,6 +1,6 @@
 local trucoState = {
-    currentValue = 1,
-    callerTeam = nil,
+    currentValue = 1,     -- Valor atual (1, 3, 6, 9, 12)
+    callerTeam = nil,      -- Qual time pediu por último ("A" ou "B")
     waitingResponse = false
 }
 
@@ -24,6 +24,18 @@ local tricksWon = { TeamA = 0, TeamB = 0 } -- Quedas na mão atual (máximo 3)
 local cardsInTable = {} -- Cartas jogadas na queda atual
 local handValue = 1 -- Valor da mão (sobe se houver Truco)
 
+-- Função Auxiliar para pegar o time do jogador
+local function getTeamOfPlayer(player)
+    local _, seatedPlayers = SeatManager.GetSeatedPlayers()
+    for name, p in pairs(seatedPlayers) do
+        if p == player then
+            local seatNum = tonumber(name:match("%d+"))
+            return (seatNum % 2 == 1) and "A" or "B"
+        end
+    end
+    return nil
+end
+
 function GameManager.GetState() 
     return currentState 
 end
@@ -35,7 +47,6 @@ local function getPartnerName(player)
         if p == player then mySeatNum = tonumber(name:match("%d+")) break end
     end
     
-    -- Duplas: 1-3 e 2-4
     local partnerSeat = (mySeatNum <= 2) and (mySeatNum + 2) or (mySeatNum - 2)
     local partner = seated["Cadeira"..partnerSeat]
     return partner and partner.Name or "Ninguém"
@@ -52,7 +63,6 @@ local function getPlayerNameBySeat(seatName)
     return player and player.Name or seatName
 end
 
--- Determina quem é o Dealer, quem Corta e quem é o Mão
 function GameManager.GetRoles()
     local cutIndex = (dealerIndex % 4) + 1
     local handIndex = ((dealerIndex - 2 + 4) % 4) + 1 
@@ -95,28 +105,31 @@ function GameManager.BeginGame()
 end
 
 function GameManager.StartNewRound()
+    trucoState.waitingResponse = false
+    trucoState.callerTeam = nil
+    trucoState.currentValue = 1
+
     tricksWon.TeamA = 0
     tricksWon.TeamB = 0
     cardsInTable = {}
     handValue = 1
-    
+
     trucoState.currentValue = 1
     trucoState.callerTeam = nil
     trucoState.waitingResponse = false
-    -- Opcional: Avisar a UI para voltar a exibir "VALE: 1"
     Events.GameStatusEvent:FireAllClients("UPDATE_ROUND_VALUE", 1)
 
-    GameManager.SetState(GameConfig.States.SHUFFLING)
-    task.wait(2)
+    DeckManager.CreateDeck()
+    DeckManager.Shuffle()
 
     GameManager.SetState(GameConfig.States.CUTTING)
+
     local roles = GameManager.GetRoles()
     local _, players = SeatManager.GetSeatedPlayers()
     local cortePlayer = players[roles.Corte]
-    
+
     if cortePlayer then
         Events.RequestAction:FireClient(cortePlayer, "EscolhaOCorte", GameConfig.CUT_TIME_LIMIT)
-        
         task.delay(GameConfig.CUT_TIME_LIMIT, function()
             if currentState == GameConfig.States.CUTTING then
                 GameManager.DistributeCards()
@@ -136,32 +149,45 @@ end)
 
 function GameManager.DistributeCards()
     GameManager.SetState(GameConfig.States.DEALING)
-    
-    DeckManager.CreateDeck()
-    DeckManager.Shuffle()
-    
+
     local deck = DeckManager.GetCurrentDeck()
+    if not deck or #deck < 13 then
+        warn("[DistributeCards] Deck inválido ou insuficiente")
+        return
+    end
+
     currentVira = table.remove(deck, 1)
+
     local _, players = SeatManager.GetSeatedPlayers()
-    
-    for seatName, player in pairs(players) do
+
+    for _, player in pairs(players) do
         local mao = {
-            table.remove(deck, 1), 
-            table.remove(deck, 1), 
+            table.remove(deck, 1),
+            table.remove(deck, 1),
             table.remove(deck, 1)
         }
-        local partner = getPartnerName(player)
-        Events.DealCards:FireClient(player, mao, currentVira, partner)
+
+        Events.DealCards:FireClient(
+            player,
+            mao,
+            currentVira,
+            getPartnerName(player)
+        )
+
+        Events.GameStatusEvent:FireClient(player, "SHOW_GAME_UI")
     end
-    
+
     task.wait(1)
+
     GameManager.SetState(GameConfig.States.PLAYING)
-    
+
     local roles = GameManager.GetRoles()
     currentTurnIndex = tonumber(string.match(roles.Mao, "%d+"))
+
     local playerName = getPlayerNameBySeat(roles.Mao)
     Events.UpdateTurnEvent:FireAllClients(playerName)
 end
+
 
 Events.PlayCardEvent.OnServerEvent:Connect(function(player, value, suit)
     if currentState ~= GameConfig.States.PLAYING then return end
@@ -196,48 +222,38 @@ function GameManager.EvaluateTrick()
         currentTurnIndex = result
     end
     
-    cardsInTable = {} -- Limpa os dados do servidor imediatamente
+    cardsInTable = {}
 
     if tricksWon.TeamA >= 2 then
         scores.TeamA += handValue
         Events.GameStatusEvent:FireAllClients("TEAM_A_WON_HAND", handValue)
-        -- ADICIONE ESTA LINHA: Atualiza o placar global (0x0)
         Events.GameStatusEvent:FireAllClients("UPDATE_SCORE", scores)
         task.wait(2)
         GameManager.ResetOrNext()
     elseif tricksWon.TeamB >= 2 then
         scores.TeamB += handValue
         Events.GameStatusEvent:FireAllClients("TEAM_B_WON_HAND", handValue)
-        -- ADICIONE ESTA LINHA: Atualiza o placar global (0x0)
         Events.GameStatusEvent:FireAllClients("UPDATE_SCORE", scores)
         task.wait(2)
         GameManager.ResetOrNext()
     else
-        -- Se a mão não acabou, apenas limpa a mesa visual dos jogadores
         Events.GameStatusEvent:FireAllClients("CLEAR_TABLE", {
             TeamA = tricksWon.TeamA, 
             TeamB = tricksWon.TeamB
         })
-        
         task.wait(1)
-        
         local nextPlayerName = getPlayerNameBySeat("Cadeira" .. currentTurnIndex)
         Events.UpdateTurnEvent:FireAllClients(nextPlayerName)
     end
 end
 
 function GameManager.ResetOrNext()
-    print("Placar: A=" .. scores.TeamA .. " | B=" .. scores.TeamB)
-    
     if scores.TeamA >= 12 or scores.TeamB >= 12 then
         GameManager.SetState(GameConfig.States.WAITING)
-        -- Avisa todos para esconderem a UI de jogo
         local _, players = SeatManager.GetSeatedPlayers()
         for _, player in pairs(players) do
             Events.GameStatusEvent:FireClient(player, "HIDE_GAME_UI")
         end
-        
-        -- Reset dos pontos para a próxima partida
         scores.TeamA = 0
         scores.TeamB = 0
     else
@@ -258,31 +274,34 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
     if currentState ~= GameConfig.States.PLAYING then return end
     
     local _, seatedPlayers = SeatManager.GetSeatedPlayers()
-    local playerSeatNum = 0
-    for name, p in pairs(seatedPlayers) do
-        if p == player then playerSeatNum = tonumber(name:match("%d+")) break end
-    end
-    local myTeam = (playerSeatNum % 2 == 1) and "A" or "B"
+    local myTeam = getTeamOfPlayer(player)
 
     if action == "Request" then
-        -- Não pode pedir truco se já houver um pedido pendente ou se for do mesmo time
         if trucoState.waitingResponse or trucoState.callerTeam == myTeam then return end
         if trucoState.currentValue >= 12 then return end
 
-        local nextValue = trucoState.currentValue == 1 and 3 or trucoState.currentValue + 3
+        local nextValue = 3
+        if trucoState.currentValue == 1 then nextValue = 3
+        elseif trucoState.currentValue == 3 then nextValue = 6
+        elseif trucoState.currentValue == 6 then nextValue = 9
+        elseif trucoState.currentValue == 9 then nextValue = 12
+        end
+
         trucoState.waitingResponse = true
-        trucoState.callerTeam = myTeam
+        trucoState.callerTeam = myTeam 
         
-        -- Notifica os oponentes que eles precisam decidir
         for _, p in pairs(seatedPlayers) do
-            local pSeat = 0
-            for name, ps in pairs(seatedPlayers) do if ps == p then pSeat = tonumber(name:match("%d+")) end end
-            local pTeam = (pSeat % 2 == 1) and "A" or "B"
-            
+            local pTeam = getTeamOfPlayer(p)
             if pTeam ~= myTeam then
-                Events.RequestAction:FireClient(p, "TrucoChallenge", {Value = nextValue, Caller = player.Name})
+                local increaseValue = (nextValue < 12) and (nextValue + 3) or nil
+                Events.RequestAction:FireClient(p, "TrucoChallenge", {
+                    Value = nextValue, 
+                    NextRaise = increaseValue, 
+                    Caller = player.Name
+                })
             else
-                Events.GameStatusEvent:FireClient(p, "Você pediu " .. nextValue .. "!")
+                Events.GameStatusEvent:FireClient(p, "Seu time pediu " .. nextValue .. "!")
+                Events.GameStatusEvent:FireClient(p, "HIDE_TRUCO_BTN")
             end
         end
 
@@ -290,50 +309,136 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
         if not trucoState.waitingResponse then return end
         
         if subAction == "Aceitar" then
-            -- 1. Atualiza os valores lógicos
-            trucoState.currentValue = (trucoState.currentValue == 1) and 3 or (trucoState.currentValue + 3)
+            if trucoState.currentValue == 1 then 
+                trucoState.currentValue = 3
+            else 
+                trucoState.currentValue = trucoState.currentValue + 3 
+            end
+            
             handValue = trucoState.currentValue
             trucoState.waitingResponse = false
             
-            -- 2. Notifica todos que foi aceito (isso muda o texto central temporariamente)
             Events.GameStatusEvent:FireAllClients("TRUCO_ACEITO", handValue)
             
-            -- 3. LOGICA NOVA: Aguarda 1.5s para os jogadores lerem e então restaura a interface
             task.delay(1.5, function()
-                -- Recupera o nome de quem é a vez agora (currentTurnIndex deve ser global no GameManager)
                 local currentPlayerName = getPlayerNameBySeat("Cadeira" .. currentTurnIndex)
-                
-                -- Faz o texto central voltar a dizer "Vez de: [Nome]"
                 Events.UpdateTurnEvent:FireAllClients(currentPlayerName)
-                
-                -- Atualiza o novo display de valor fixo (ex: "VALE: 3")
                 Events.GameStatusEvent:FireAllClients("UPDATE_ROUND_VALUE", handValue)
             end)
-            
+
         elseif subAction == "Correr" then
-            -- Time que correu perde a mão. O time que pediu ganha o valor ATUAL da mão
             local winnerTeam = (myTeam == "A") and "B" or "A"
             trucoState.waitingResponse = false
             GameManager.ForceWinHand(winnerTeam)
-            
+
         elseif subAction == "Aumentar" then
-            -- Lógica recursiva: quem recebeu o truco agora pede o próximo nível
-            trucoState.waitingResponse = false -- Reseta para permitir o novo pedido
-            -- Simula um novo pedido vindo deste jogador para o próximo nível
-            -- (Necessário ajustar a lógica para o próximo nível ser 6, 9, 12)
+            -- Define próximo valor
+            local nextValue
+            if trucoState.currentValue == 1 then nextValue = 3
+            elseif trucoState.currentValue == 3 then nextValue = 6
+            elseif trucoState.currentValue == 6 then nextValue = 9
+            elseif trucoState.currentValue == 9 then nextValue = 12
+            end
+
+            trucoState.currentValue = nextValue
+            trucoState.callerTeam = myTeam
+            trucoState.waitingResponse = true
+            handValue = nextValue
+
+            -- Envia desafio para o OUTRO time
+            for _, p in pairs(seatedPlayers) do
+                local pTeam = getTeamOfPlayer(p)
+                if pTeam ~= myTeam then
+                    Events.RequestAction:FireClient(p, "TrucoChallenge", {
+                        Value = nextValue,
+                        Caller = player.Name
+                    })
+                else
+                    Events.GameStatusEvent:FireClient(p, "HIDE_TRUCO_BTN")
+                end
+            end
+
+            Events.GameStatusEvent:FireAllClients("UPDATE_ROUND_VALUE", nextValue)
         end
     end
 end)
 
 function GameManager.ForceWinHand(team)
     if team == "A" then scores.TeamA += handValue else scores.TeamB += handValue end
-    
-    -- Notifica vitória da mão e ATUALIZA O PLACAR GLOBAL
     Events.GameStatusEvent:FireAllClients("TEAM_"..team.."_WON_HAND", handValue)
     Events.GameStatusEvent:FireAllClients("UPDATE_SCORE", scores)
-    
     task.wait(2)
     GameManager.ResetOrNext()
 end
+
+function GameManager.RequestTruco(player)
+    if trucoState.waitingResponse then
+        return -- já tem pedido pendente
+    end
+
+    local team = SeatManager.GetPlayerTeam(player)
+    local nextValue = GameManager.GetNextTrucoValue()
+
+    trucoState.waitingResponse = true
+    trucoState.callerTeam = team
+    trucoState.currentValue = nextValue
+
+    local targetTeam = getOppositeTeam(team)
+    local targetPlayers = SeatManager.GetPlayersByTeam(targetTeam)
+
+    for _, p in pairs(targetPlayers) do
+        Events.ShowTrucoChallenge:FireClient(p, nextValue, player.Name)
+    end
+end
+
+function GameManager.AcceptTruco(player)
+    if not trucoState.waitingResponse then return end
+
+    trucoState.waitingResponse = false
+    trucoState.callerTeam = nil
+
+    handValue = trucoState.currentValue
+
+    Events.GameStatusEvent:FireAllClients(
+        "UPDATE_ROUND_VALUE",
+        handValue
+    )
+end
+
+function GameManager.RunFromTruco(player)
+    if not trucoState.waitingResponse then return end
+
+    local losingTeam = SeatManager.GetPlayerTeam(player)
+    local winningTeam = getOppositeTeam(losingTeam)
+
+    GameManager.EndHand(winningTeam)
+
+    trucoState.waitingResponse = false
+    trucoState.callerTeam = nil
+end
+
+function GameManager.RequestRaise(player)
+    if not trucoState.waitingResponse then return end
+
+    local team = SeatManager.GetPlayerTeam(player)
+
+    if team ~= getOppositeTeam(trucoState.callerTeam) then
+        return -- só quem recebeu pode aumentar
+    end
+
+    trucoState.waitingResponse = false
+    GameManager.RequestTruco(player)
+end
+
+function GameManager.EndHand(winningTeam)
+    trucoState.waitingResponse = false
+    trucoState.callerTeam = nil
+    trucoState.currentValue = 1
+
+    ScoreManager.AddPoint(winningTeam, handValue)
+
+    GameManager.StartNewRound()
+end
+
 
 return GameManager

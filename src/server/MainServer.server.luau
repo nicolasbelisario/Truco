@@ -30,3 +30,7 @@ SeatManager.Init(function()
     -- Envia o estado atual do jogo para todos os que estão sentados
     GameManager.NotifySeatedPlayers(state, 0)
 end)
+
+local function getOppositeTeam(team)
+    return team == "TeamA" and "TeamB" or "TeamA"
+end

@@ -42,22 +42,33 @@ Events.RequestAction.OnClientEvent:Connect(function(actionType, data)
     end
 end)
 
+-- Substitua o listener do GameStatusEvent por este:
 Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
-    -- 1. Limpeza de UI: Se o truco foi aceito ou a mão acabou, fecha o menu de decisão em todos os clientes
+    -- 1. VERIFICAÇÕES TÉCNICAS E ESTADOS
+    if message == "HIDE_TRUCO_BTN" then
+        UIManager.SetCanTruco(false)
+        return
+    elseif message == "SHOW_TRUCO_BTN" then
+        UIManager.SetCanTruco(true)
+        return
+    elseif message == "DEALING" then
+        if UIManager.HideCutMenu then 
+            UIManager.HideCutMenu() 
+        end
+        return
+    end -- <--- O 'END' QUE FALTAVA ESTÁ AQUI
+
+    -- 2. LIMPEZA E CÂMERA
     if message == "TRUCO_ACEITO" or message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
-        UIManager.HideTrucoChallenge() -- Garante que o menu suma para você e seu parceiro
+        UIManager.HideTrucoChallenge()
+        if UIManager.ResetCamera then UIManager.ResetCamera() end
     end
 
-    -- 2. Estrutura Principal de Eventos
+    -- 3. ESTRUTURA PRINCIPAL
     if message == "CLEAR_TABLE" then
-        -- Organiza o placar baseado no meu time
         local myTricks = (myTeam == "A") and data.TeamA or data.TeamB
         local enemyTricks = (myTeam == "A") and data.TeamB or data.TeamA
-        
         UIManager.UpdateRoundStats(currentPartner, myTricks, enemyTricks)
-        -- task.delay(0.5, function()
-        --     UIManager.ClearTable()
-        -- end)
         UIManager.ClearTable()
 
     elseif message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
@@ -68,13 +79,11 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         local myScore = (myTeam == "A") and data.TeamA or data.TeamB
         local enemyScore = (myTeam == "A") and data.TeamB or data.TeamA
         UIManager.UpdateGameScore(myScore, enemyScore)
-    
+        
     elseif message == "UPDATE_ROUND_VALUE" then
-        -- Atualiza apenas o pequeno selo "VALE: X" e não o texto central
         UIManager.UpdateRoundValue(data)
 
     elseif message == "TRUCO_ACEITO" then
-        -- Mostra a confirmação no centro da tela temporariamente
         UIManager.UpdateStatus("TRUCO ACEITO! Vale " .. data, 0)
 
     elseif message == "TRUCO_CALLED" then
@@ -85,13 +94,14 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
 
     elseif message == "HIDE_SCOREBOARD" then
         UIManager.HideScoreboard()
-    
+        
     elseif message == "HIDE_GAME_UI" then
         UIManager.SetGameplayUIVisibility(false)
-    
+
+    elseif message == "SHOW_GAME_UI" then
+        UIManager.SetGameplayUIVisibility(true)
+        
     else
-        -- Só cai aqui se for uma mensagem de texto comum (Vez de fulano, Contagem, etc.)
-        -- Isso evita que nomes técnicos como "UPDATE_ROUND_VALUE" apareçam no centro da tela
         UIManager.UpdateStatus(message, data)
     end
 end)

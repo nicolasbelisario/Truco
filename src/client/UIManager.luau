@@ -10,21 +10,13 @@ local TweenService = game:GetService("TweenService")
 
 
 -- Referencias globais da UI
-local screenGui
-local handFrame
-local countdownLabel
-local cutFrame
-local timerBar
-local viraDisplay
-local tableCenter
-local trucoBtn
-local statsLabel
-local statsFrame
-local challengeFrame
+local screenGui, handFrame, countdownLabel, cutFrame, timerBar, viraDisplay
+local tableCenter, trucoBtn, statsLabel, statsFrame, challengeFrame, roundValueLabel, gameScoreLabel
 
 local isSeated = false
 local isMyTurn = false
 local mySeatName = ""
+local canITruco = true
 
 function UIManager.Init()
     screenGui = Instance.new("ScreenGui")
@@ -91,19 +83,20 @@ function UIManager.Init()
     -- Botão de Truco
     trucoBtn = Instance.new("TextButton")
     trucoBtn.Name = "TrucoBtn"
-    trucoBtn.Size = UDim2.new(0, 140, 0, 60)
+    trucoBtn.Size = UDim2.new(0, 180, 0, 80) -- Tamanho maior
     trucoBtn.Position = UDim2.new(0.85, 0, 0.85, 0)
     trucoBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
     trucoBtn.Text = "TRUCO!"
     trucoBtn.TextColor3 = Color3.new(1,1,1)
     trucoBtn.Font = Enum.Font.GothamBlack
+    trucoBtn.TextSize = 35 -- FONTE AUMENTADA
     trucoBtn.Visible = false
     trucoBtn.Parent = screenGui
     Instance.new("UICorner", trucoBtn)
     
     trucoBtn.Activated:Connect(function()
         Events.TrucoEvent:FireServer("Request")
-        trucoBtn.Visible = false
+        UIManager.SetCanTruco(false)
     end)
 
     -- Menu de Corte
@@ -314,13 +307,29 @@ function UIManager.ShowCutOptions(timeLimit)
         local tweenInfo = TweenInfo.new(timeLimit, Enum.EasingStyle.Linear)
         local tween = TweenService:Create(timerBar, tweenInfo, {Size = UDim2.new(0, 0, 1, 0)})
         tween:Play()
+        
+        task.delay(timeLimit + 0.5, function()
+            if cutFrame.Visible then
+                cutFrame.Visible = false
+            end
+        end)
     end
 end
 
 function UIManager.UpdateStatus(msg, val)
     if not isSeated or not countdownLabel then return end
+    
+    -- Se val for nil, tratamos como 0
+    val = val or 0 
+    
     local display = GameConfig.StateDisplayNames[msg] or msg
-    countdownLabel.Text = val > 0 and (display .. " " .. val) or display
+    
+    -- Corrigindo a comparação
+    if val > 0 then
+        countdownLabel.Text = display .. " " .. val
+    else
+        countdownLabel.Text = display
+    end
 end
 
 function UIManager.AddCardToHand(val, suit)
@@ -389,17 +398,25 @@ function UIManager.ClearTable()
 end
 
 function UIManager.UpdateTurn(playerName)
-    -- Se o nome recebido for igual ao seu nome no Roblox
     isMyTurn = (playerName == player.Name)
     
-    local displayName = isMyTurn and "SUA VEZ!" or "Vez de: " .. playerName
-    trucoBtn.Visible = isMyTurn
-    UIManager.UpdateStatus(displayName, 0)
-end
+    -- O botão agora respeita a variável canITruco inicializada
+    trucoBtn.Visible = isMyTurn and canITruco
+    
+    -- Atualiza o texto do botão baseado no valor atual do RoundValueLabel
+    local currentVal = 1
+    if roundValueLabel and roundValueLabel.Text then
+        currentVal = tonumber(roundValueLabel.Text:match("%d+")) or 1
+    end
 
-function UIManager.SetVira(v, s)
-    viraDisplay.Text = "VIRA:\n" .. v .. " de " .. s
-    viraDisplay.Visible = isSeated
+    if currentVal == 1 then trucoBtn.Text = "TRUCO!"
+    elseif currentVal == 3 then trucoBtn.Text = "SEIS!"
+    elseif currentVal == 6 then trucoBtn.Text = "NOVE!"
+    elseif currentVal == 9 then trucoBtn.Text = "DOZE!"
+    end
+
+    local displayName = isMyTurn and "SUA VEZ!" or "Vez de: " .. playerName
+    UIManager.UpdateStatus(displayName, 0)
 end
 
 function UIManager.SetSeated(s)
@@ -443,12 +460,19 @@ end
 function UIManager.ClearHand()
     if handFrame then
         handFrame:ClearAllChildren()
-        -- Recria o layout se necessário (já que ClearAllChildren apaga o UIListLayout)
         local handLayout = Instance.new("UIListLayout", handFrame)
         handLayout.FillDirection = Enum.FillDirection.Horizontal
         handLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         handLayout.Padding = UDim.new(0, 15)
     end
+    
+    -- CORREÇÃO: Se as cartas foram dadas, o tempo de corte acabou
+    if cutFrame then
+        cutFrame.Visible = false
+    end
+    
+    -- Reseta a possibilidade de truco para a nova mão
+    UIManager.SetCanTruco(true)
 end
 
 function UIManager.ShowRoundWinner(teamName)
@@ -487,10 +511,10 @@ end
 function UIManager.CreateChallengeUI()
     challengeFrame = Instance.new("Frame")
     challengeFrame.Name = "TrucoChallengeFrame"
-    challengeFrame.Size = UDim2.new(0, 300, 0, 180)
+    challengeFrame.Size = UDim2.new(0, 350, 0, 200)
     challengeFrame.Position = UDim2.new(0.5, 0, 0.4, 0)
     challengeFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    challengeFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    challengeFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     challengeFrame.Visible = false
     challengeFrame.Parent = screenGui
     Instance.new("UICorner", challengeFrame)
@@ -503,34 +527,93 @@ function UIManager.CreateChallengeUI()
     txt.BackgroundTransparency = 1
     txt.Parent = challengeFrame
 
-    local function createBtn(text, color, xPos, response)
+    local function createBtn(text, color, xPos, response, btnName)
         local b = Instance.new("TextButton")
+        b.Name = btnName -- AGORA DEFINIMOS O NOME
         b.Text = text
         b.Size = UDim2.new(0.28, 0, 0.35, 0)
         b.Position = UDim2.new(xPos, 0, 0.55, 0)
         b.BackgroundColor3 = color
         b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 20
         b.Parent = challengeFrame
         Instance.new("UICorner", b)
         
         b.Activated:Connect(function()
             challengeFrame.Visible = false
+            UIManager.ResetCamera() -- Volta a câmera ao normal
             Events.TrucoEvent:FireServer("Response", response)
         end)
     end
 
-    createBtn("DESCER", Color3.fromRGB(0, 150, 0), 0.04, "Aceitar")
-    createBtn("FUGIR", Color3.fromRGB(150, 0, 0), 0.36, "Correr")
-    createBtn("6!", Color3.fromRGB(200, 150, 0), 0.68, "Aumentar")
+    createBtn("DESCER", Color3.fromRGB(0, 150, 0), 0.04, "Aceitar", "AceitarBtn")
+    createBtn("FUGIR", Color3.fromRGB(150, 0, 0), 0.36, "Correr", "CorrerBtn")
+    createBtn("AUMENTAR", Color3.fromRGB(200, 150, 0), 0.68, "Aumentar", "AumentarBtn")
 end
 
--- Esta é a função que o seu init.client.luau não estava encontrando
+function UIManager.ApplyTensionCamera(targetPlayerName)
+    local targetPlayer = game.Players:FindFirstChild(targetPlayerName)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Head") then return end
+
+    Camera.CameraType = Enum.CameraType.Scriptable
+    
+    local targetPos = targetPlayer.Character.Head.Position + (targetPlayer.Character.Head.CFrame.LookVector * 5) + Vector3.new(0, 1, 0)
+    local lookAt = targetPlayer.Character.Head.Position
+
+    local tween = TweenService:Create(Camera, TweenInfo.new(1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        CFrame = CFrame.new(targetPos, lookAt)
+    })
+    tween:Play()
+end
+
+function UIManager.ResetCamera()
+    Camera.CameraType = Enum.CameraType.Custom
+end
+
 function UIManager.ShowTrucoChallenge(value, requester)
-    if not challengeFrame then 
-        UIManager.CreateChallengeUI() 
-    end
-    challengeFrame.Title.Text = requester .. " pediu " .. value .. "!"
+    if not challengeFrame then UIManager.CreateChallengeUI() end
+    
+    challengeFrame.Title.Text = requester .. " PEDIU " .. value .. "!"
     challengeFrame.Visible = true
+    
+    -- Ajusta o botão de aumentar dinamicamente
+    local raiseBtn = challengeFrame:FindFirstChild("AumentarBtn")
+    if raiseBtn then
+        local nextVal = (value < 12) and (value + 3) or 12
+        raiseBtn.Text = nextVal .. "!"
+        raiseBtn.Visible = (value < 12)
+    end
+
+    -- ATIVA A CÂMERA DE TENSÃO
+    UIManager.ApplyTensionCamera(requester)
+end
+
+function UIManager.HideCutMenu()
+    if cutFrame then 
+        cutFrame.Visible = false 
+    end
+end
+
+function UIManager.HideTrucoChallenge()
+    if challengeFrame then
+        challengeFrame.Visible = false
+    end
+    -- Reseta a câmera quando o menu some
+    UIManager.ResetCamera()
+end
+
+-- Garanta que a função SetCanTruco também esteja acessível
+function UIManager.SetCanTruco(allowed)
+    canITruco = allowed
+    if trucoBtn then
+        trucoBtn.Visible = isMyTurn and canITruco
+    end
+end
+
+function UIManager.SetVira(v, s)
+    viraDisplay.Text = "VIRA:\n" .. v .. " de " .. s
+    viraDisplay.Visible = isSeated
 end
 
 return UIManager
