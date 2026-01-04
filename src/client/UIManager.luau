@@ -9,9 +9,10 @@ local GameConfig = require(Shared:WaitForChild("GameConfig"))
 local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 
--- Componentes da UI
+-- Variáveis Globais de UI
 local screenGui, handFrame, countdownLabel, cutFrame, timerBar, viraDisplay
 local tableCenter, trucoBtn, statsLabel, statsFrame, challengeFrame, roundValueLabel, gameScoreLabel
+local challengeTimerBar
 
 local isSeated = false
 local isMyTurn = false
@@ -26,7 +27,23 @@ function UIManager.Init()
     screenGui.IgnoreGuiInset = true
     screenGui.Parent = playerGui
 
-    -- Frame da Mesa (Cartas jogadas)
+    -- --- CONTAINER DE INFORMAÇÕES (NOVA ESTRUTURA) ---
+    -- Cria um grupo para segurar o Placar e os Stats juntos
+    local infoContainer = Instance.new("Frame")
+    infoContainer.Name = "InfoContainer"
+    -- Posicionado em 2% da esquerda e descido 60 pixels (para não bater no menu do Roblox)
+    infoContainer.Position = UDim2.new(0.02, 0, 0, 60) 
+    infoContainer.Size = UDim2.new(0, 250, 0.5, 0)
+    infoContainer.BackgroundTransparency = 1
+    infoContainer.Parent = screenGui
+
+    -- O ListLayout organiza automaticamente um embaixo do outro
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = infoContainer
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 10) -- Espaço de 10px entre os painéis
+
+    -- 1. Frame da Mesa (Centro)
     tableCenter = Instance.new("Frame")
     tableCenter.Name = "TableCenter"
     tableCenter.Size = UDim2.new(0.5, 0, 0.4, 0)
@@ -40,7 +57,7 @@ function UIManager.Init()
     grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
     grid.VerticalAlignment = Enum.VerticalAlignment.Center
 
-    -- Mão do Jogador
+    -- 2. Mão do Jogador
     handFrame = Instance.new("Frame")
     handFrame.Name = "HandFrame"
     handFrame.Size = UDim2.new(0.6, 0, 0.2, 0)
@@ -54,7 +71,7 @@ function UIManager.Init()
     handLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     handLayout.Padding = UDim.new(0, 15)
 
-    -- Labels de Status e Pontuação
+    -- 3. Labels e Status
     countdownLabel = Instance.new("TextLabel")
     countdownLabel.Size = UDim2.new(0.8, 0, 0.1, 0)
     countdownLabel.Position = UDim2.new(0.5, 0, 0.15, 0)
@@ -78,7 +95,6 @@ function UIManager.Init()
     viraDisplay.Parent = screenGui
     Instance.new("UICorner", viraDisplay)
 
-    -- Botão de Truco
     trucoBtn = Instance.new("TextButton")
     trucoBtn.Size = UDim2.new(0, 180, 0, 80)
     trucoBtn.Position = UDim2.new(0.85, 0, 0.85, 0)
@@ -96,14 +112,15 @@ function UIManager.Init()
         UIManager.SetCanTruco(false)
     end)
 
-    -- Stats Frame
+    -- --- STATS FRAME (MODIFICADO) ---
     statsFrame = Instance.new("Frame")
     statsFrame.Size = UDim2.new(0, 200, 0, 100)
-    statsFrame.Position = UDim2.new(0.02, 0, 0.05, 0)
+    -- NÃO DEFINIMOS POSITION POIS O PARENT É O CONTAINER
     statsFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     statsFrame.BackgroundTransparency = 0.5
     statsFrame.Visible = false
-    statsFrame.Parent = screenGui
+    statsFrame.LayoutOrder = 1 -- Fica em primeiro lugar na lista
+    statsFrame.Parent = infoContainer -- PAI É O CONTAINER
     Instance.new("UICorner", statsFrame)
 
     statsLabel = Instance.new("TextLabel")
@@ -118,9 +135,10 @@ function UIManager.Init()
     statsLabel.Text = "Dupla: ...\nNós: 0 Quedas\nEles: 0 Quedas"
     statsLabel.Parent = statsFrame
 
+    -- --- GAME SCORE LABEL (MODIFICADO) ---
     gameScoreLabel = Instance.new("TextLabel")
     gameScoreLabel.Size = UDim2.new(0, 220, 0, 60)
-    gameScoreLabel.Position = UDim2.new(0.02, 0, 0.18, 0)
+    -- NÃO DEFINIMOS POSITION
     gameScoreLabel.BackgroundTransparency = 0.4
     gameScoreLabel.BackgroundColor3 = Color3.fromRGB(20,20,20)
     gameScoreLabel.TextColor3 = Color3.new(1,1,1)
@@ -128,7 +146,8 @@ function UIManager.Init()
     gameScoreLabel.TextSize = 22
     gameScoreLabel.Text = "JOGO: 0 x 0"
     gameScoreLabel.Visible = false
-    gameScoreLabel.Parent = screenGui
+    gameScoreLabel.LayoutOrder = 2 -- Fica em segundo lugar (abaixo do stats)
+    gameScoreLabel.Parent = infoContainer -- PAI É O CONTAINER
     Instance.new("UICorner", gameScoreLabel)
 
     roundValueLabel = Instance.new("TextLabel")
@@ -147,10 +166,11 @@ function UIManager.Init()
     UIManager.CreateChallengeUI()
 end
 
--- --- CRIAÇÃO DE MENUS AUXILIARES ---
+-- --- UI CREATION FUNCTIONS ---
 
 function UIManager.CreateCutMenu()
     cutFrame = Instance.new("Frame")
+    cutFrame.Name = "CutFrame"
     cutFrame.Size = UDim2.new(0, 400, 0, 220)
     cutFrame.Position = UDim2.new(0.5, 0, 0.45, 0)
     cutFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -219,7 +239,7 @@ end
 function UIManager.CreateChallengeUI()
     challengeFrame = Instance.new("Frame")
     challengeFrame.Name = "TrucoChallengeFrame"
-    challengeFrame.Size = UDim2.new(0, 350, 0, 200)
+    challengeFrame.Size = UDim2.new(0, 350, 0, 220)
     challengeFrame.Position = UDim2.new(0.5, 0, 0.4, 0)
     challengeFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     challengeFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -227,13 +247,37 @@ function UIManager.CreateChallengeUI()
     challengeFrame.Parent = screenGui
     Instance.new("UICorner", challengeFrame)
 
+    local timerBg = Instance.new("Frame")
+    timerBg.Name = "TimerBG"
+    timerBg.Size = UDim2.new(1, 0, 0, 8)
+    timerBg.Position = UDim2.new(0,0,1,0)
+    timerBg.AnchorPoint = Vector2.new(0,1)
+    timerBg.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    timerBg.Parent = challengeFrame
+    
+    challengeTimerBar = Instance.new("Frame")
+    challengeTimerBar.Name = "TimerBar"
+    challengeTimerBar.Size = UDim2.new(1, 0, 1, 0)
+    challengeTimerBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    challengeTimerBar.BorderSizePixel = 0
+    challengeTimerBar.Parent = timerBg
+
     local txt = Instance.new("TextLabel")
     txt.Name = "Title"
-    txt.Size = UDim2.new(1, 0, 0.4, 0)
+    txt.Size = UDim2.new(1, 0, 0.3, 0)
     txt.TextScaled = true
     txt.TextColor3 = Color3.new(1, 1, 1)
     txt.BackgroundTransparency = 1
     txt.Parent = challengeFrame
+    
+    local statusTxt = Instance.new("TextLabel")
+    statusTxt.Name = "Status"
+    statusTxt.Text = ""
+    statusTxt.Size = UDim2.new(1, 0, 0.15, 0)
+    statusTxt.Position = UDim2.new(0, 0, 0.3, 0)
+    statusTxt.TextColor3 = Color3.fromRGB(255, 200, 0)
+    statusTxt.BackgroundTransparency = 1
+    statusTxt.Parent = challengeFrame
 
     local function createBtn(text, color, xPos, response, btnName)
         local b = Instance.new("TextButton")
@@ -249,8 +293,8 @@ function UIManager.CreateChallengeUI()
         Instance.new("UICorner", b)
         
         b.Activated:Connect(function()
-            challengeFrame.Visible = false
-            UIManager.ResetCamera()
+            statusTxt.Text = "Aguardando Parceiro..."
+            b.BackgroundColor3 = Color3.fromRGB(100, 100, 100) 
             Events.TrucoEvent:FireServer("Response", response)
         end)
     end
@@ -260,17 +304,69 @@ function UIManager.CreateChallengeUI()
     createBtn("AUMENTAR", Color3.fromRGB(200, 150, 0), 0.68, "Aumentar", "AumentarBtn")
 end
 
--- --- FUNÇÕES VISUAIS DE JOGO ---
+-- --- EXPOSED FUNCTIONS ---
+
+function UIManager.UpdateChallengeStatus(msg)
+    if challengeFrame and challengeFrame.Visible then
+        local status = challengeFrame:FindFirstChild("Status")
+        if status then status.Text = msg end
+    end
+end
+
+function UIManager.ShowTrucoChallenge(value, requester, timeLimit)
+    if not challengeFrame then UIManager.CreateChallengeUI() end
+    
+    local title = challengeFrame:FindFirstChild("Title")
+    local status = challengeFrame:FindFirstChild("Status")
+    
+    if title then title.Text = requester .. " PEDIU " .. value .. "!" end
+    if status then status.Text = "Decidam juntos!" end
+    
+    local acceptBtn = challengeFrame:FindFirstChild("AceitarBtn")
+    local runBtn = challengeFrame:FindFirstChild("CorrerBtn")
+    local raiseBtn = challengeFrame:FindFirstChild("AumentarBtn")
+    
+    if acceptBtn then acceptBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0) end
+    if runBtn then runBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0) end
+    if raiseBtn then 
+        raiseBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+        local nextVal = (value < 12) and (value + 3) or 12
+        raiseBtn.Text = nextVal .. "!"
+        raiseBtn.Visible = (value < 12)
+    end
+
+    challengeFrame.Visible = true
+    UIManager.ApplyTensionCamera(requester)
+    
+    -- ANIMAÇÃO DA BARRA DE TEMPO
+    if challengeTimerBar then
+        -- Sempre reseta para cheio primeiro
+        challengeTimerBar.Size = UDim2.new(1, 0, 1, 0)
+        
+        -- Só anima se o tempo for válido
+        if timeLimit and timeLimit > 0 then
+            local tweenInfo = TweenInfo.new(timeLimit, Enum.EasingStyle.Linear)
+            local tween = TweenService:Create(challengeTimerBar, tweenInfo, {Size = UDim2.new(0, 0, 1, 0)})
+            tween:Play()
+        end
+    end
+end
+
+function UIManager.HideTrucoChallenge()
+    if challengeFrame then challengeFrame.Visible = false end
+    UIManager.ResetCamera()
+end
 
 function UIManager.ShowCutOptions(timeLimit)
     if cutFrame then
         cutFrame.Visible = true
         timerBar.Size = UDim2.new(1, 0, 1, 0)
-        local tween = TweenService:Create(timerBar, TweenInfo.new(timeLimit), {Size = UDim2.new(0, 0, 1, 0)})
+        local tweenInfo = TweenInfo.new(timeLimit, Enum.EasingStyle.Linear)
+        local tween = TweenService:Create(timerBar, tweenInfo, {Size = UDim2.new(0, 0, 1, 0)})
         tween:Play()
         
         task.delay(timeLimit + 0.5, function()
-            cutFrame.Visible = false
+            if cutFrame.Visible then cutFrame.Visible = false end
         end)
     end
 end
@@ -278,6 +374,17 @@ end
 function UIManager.HideCutMenu()
     if cutFrame then cutFrame.Visible = false end
 end
+
+function UIManager.FullReset()
+    UIManager.ClearHand()
+    UIManager.ClearTable()
+    UIManager.SetGameplayUIVisibility(false)
+    UIManager.HideScoreboard()
+    UIManager.HideTrucoChallenge()
+    if countdownLabel then countdownLabel.Text = "" end
+end
+
+-- --- GAMEPLAY UI ---
 
 function UIManager.AddCardToHand(val, suit)
     local btn = Instance.new("TextButton")
@@ -306,6 +413,9 @@ function UIManager.AddPlayedCardUI(playerName, val, suit)
     card.Font = Enum.Font.GothamBold
     card.Text = playerName .. "\n" .. val .. " " .. suit
     card.TextScaled = true
+    
+    local padding = Instance.new("UIPadding", card)
+    padding.PaddingTop = UDim.new(0.1, 0)
     
     card.Parent = tableCenter
     Instance.new("UICorner", card)
@@ -337,12 +447,14 @@ function UIManager.ClearHand()
     UIManager.SetCanTruco(true)
 end
 
--- --- CONTROLE DE ESTADO E CÂMERA ---
-
 function UIManager.UpdateStatus(msg, val)
     if not isSeated or not countdownLabel then return end
     local display = GameConfig.StateDisplayNames[msg] or msg
-    countdownLabel.Text = (val and val > 0) and (display .. " " .. val) or display
+    if val and val > 0 then
+        countdownLabel.Text = display .. " " .. val
+    else
+        countdownLabel.Text = display
+    end
 end
 
 function UIManager.UpdateTurn(playerName)
@@ -366,34 +478,8 @@ end
 function UIManager.SetSeated(s)
     isSeated = s
     if not s then
-        UIManager.ClearHand()
-        UIManager.ClearTable()
-        UIManager.SetGameplayUIVisibility(false)
-        countdownLabel.Text = ""
+        UIManager.FullReset()
     end
-end
-
-function UIManager.ShowTrucoChallenge(value, requester)
-    if not challengeFrame then UIManager.CreateChallengeUI() end
-    
-    local title = challengeFrame:FindFirstChild("Title")
-    if title then title.Text = requester .. " PEDIU " .. value .. "!" end
-    
-    challengeFrame.Visible = true
-    
-    local raiseBtn = challengeFrame:FindFirstChild("AumentarBtn")
-    if raiseBtn then
-        local nextVal = (value < 12) and (value + 3) or 12
-        raiseBtn.Text = nextVal .. "!"
-        raiseBtn.Visible = (value < 12)
-    end
-
-    UIManager.ApplyTensionCamera(requester)
-end
-
-function UIManager.HideTrucoChallenge()
-    if challengeFrame then challengeFrame.Visible = false end
-    UIManager.ResetCamera()
 end
 
 function UIManager.SetGameplayUIVisibility(visible)
@@ -424,11 +510,9 @@ function UIManager.ResetCamera()
     Camera.CameraType = Enum.CameraType.Custom
 end
 
--- --- UTILIDADES DE SETTERS ---
+-- --- UTILIDADES ---
 
-function UIManager.SetMySeat(n) 
-    -- mySeatName = n (variável local não usada, mas mantida caso precise no futuro)
-end
+function UIManager.SetMySeat(n) end
 
 function UIManager.SetCanTruco(allowed)
     canITruco = allowed
@@ -495,7 +579,6 @@ function UIManager.ShowSignal(sender, signalType)
     lbl.TextSize = 50
     bg.Parent = sender.Character.Head
     
-    -- Efeito de Highlight temporário
     local highlight = Instance.new("Highlight")
     highlight.Adornee = sender.Character
     highlight.FillTransparency = 1
