@@ -10,8 +10,9 @@ local GameManager = {}
 
 -- Estado Global
 local trucoState = {
-	currentValue = 1,
-	callerTeam = nil,
+	currentValue = 1,     -- Valor VALENDO na mesa agora
+	pendingValue = 0,     -- Valor sendo PROPOSTO (durante o pedido)
+	callerTeam = nil,     -- Quem pediu o aumento atual
 	waitingResponse = false,
 	challengeId = 0,
 	votes = {}
@@ -105,6 +106,7 @@ function GameManager.StartNewRound()
 	trucoState.waitingResponse = false
 	trucoState.callerTeam = nil
 	trucoState.currentValue = 1
+	trucoState.pendingValue = 0
 	trucoState.votes = {} 
 	
 	tricksWon.TeamA = 0
@@ -113,6 +115,9 @@ function GameManager.StartNewRound()
 	handValue = 1
 
 	Events.GameStatusEvent:FireAllClients("UPDATE_ROUND_VALUE", 1)
+	-- No início da rodada, TODOS podem pedir Truco
+	Events.GameStatusEvent:FireAllClients("SHOW_TRUCO_BTN", 0)
+
 	DeckManager.CreateDeck()
 	DeckManager.Shuffle()
 	GameManager.SetState(GameConfig.States.CUTTING)
@@ -177,7 +182,6 @@ Events.PlayCardEvent.OnServerEvent:Connect(function(player, value, suit, isHidde
 	local _, seatedPlayers = SeatManager.GetSeatedPlayers()
 	if seatedPlayers["Cadeira" .. currentTurnIndex] ~= player then return end
 
-	-- CORREÇÃO 1: Usando a função correta getCurrentTrickNumber() em vez de gameSession
 	if getCurrentTrickNumber() == 1 then
 		isHidden = false
 	end
@@ -201,17 +205,13 @@ Events.PlayCardEvent.OnServerEvent:Connect(function(player, value, suit, isHidde
 end)
 
 function GameManager.EvaluateTrick()
-	-- CORREÇÃO 2 e 3: Nome da função correta e lógica de retorno
 	local winnerResult = RuleManager.GetRoundWinner(cardsInTable, currentVira.Value)
 	
 	if winnerResult == "DRAW" then
-		-- Empate (Canga) - Regra simplificada: O primeiro a jogar "ganha" o ponto da queda momentaneamente 
-		-- (Isso pode ser ajustado para regras de canga específicas depois)
 		local winnerPlayer = cardsInTable[1].Player
 		local team = getTeamOfPlayer(winnerPlayer)
 		if team == "A" then tricksWon.TeamA += 1 else tricksWon.TeamB += 1 end
 		
-		-- Quem torna é quem ganhou a maior (ou o primeiro em caso de empate total)
 		local _, seated = SeatManager.GetSeatedPlayers()
 		for seatName, p in pairs(seated) do
 			if p == winnerPlayer then
@@ -221,7 +221,6 @@ function GameManager.EvaluateTrick()
 		end
 
 	elseif typeof(winnerResult) == "Instance" and winnerResult:IsA("Player") then
-		-- Vitória normal
 		local winnerPlayer = winnerResult
 		local team = getTeamOfPlayer(winnerPlayer)
 		if team == "A" then tricksWon.TeamA += 1 else tricksWon.TeamB += 1 end
@@ -256,8 +255,38 @@ function GameManager.WinHand(teamWinner)
 	GameManager.ResetOrNext()
 end
 
+-- Substitua a função ResetOrNext antiga por esta:
 function GameManager.ResetOrNext()
+	-- Verifica se alguém atingiu 12 ou mais pontos
 	if scores.TeamA >= 12 or scores.TeamB >= 12 then
+		
+		-- Descobre qual time ganhou
+		local winningTeam = (scores.TeamA >= 12) and "A" or "B"
+		
+		-- Coleta os nomes dos vencedores
+		local winnerNames = {}
+		local _, seated = SeatManager.GetSeatedPlayers()
+		
+		for _, p in pairs(seated) do
+			if getTeamOfPlayer(p) == winningTeam then
+				table.insert(winnerNames, p.Name)
+			end
+		end
+		
+		-- Garante que tem nome (caso esteja testando sozinho)
+		local p1 = winnerNames[1] or "Fantasma"
+		local p2 = winnerNames[2] or "Ninguém"
+		
+		-- Monta a frase da vitória
+		local victoryMessage = p1 .. " e " .. p2 .. " Ganharam a Partida!!!"
+		
+		-- Envia para todos os clientes
+		Events.GameStatusEvent:FireAllClients("MATCH_WON", victoryMessage)
+		
+		-- Espera 10 segundos de celebração antes de resetar tudo
+		task.wait(10)
+		
+		-- Reseta o jogo
 		GameManager.SetState(GameConfig.States.WAITING)
 		local _, players = SeatManager.GetSeatedPlayers()
 		for _, player in pairs(players) do
@@ -268,6 +297,7 @@ function GameManager.ResetOrNext()
 		scores.TeamA = 0
 		scores.TeamB = 0
 	else
+		-- Segue o jogo normal
 		dealerIndex = (dealerIndex - 2) % 4 + 1
 		GameManager.StartNewRound()
 	end
@@ -285,12 +315,14 @@ end
 function GameManager.StartTrucoTimer(challengeId, targetTeam)
 	task.delay(15, function()
 		if trucoState.challengeId == challengeId and trucoState.waitingResponse then
-			print("Tempo esgotado para o Truco! Forçando correr.")
+			print("Tempo esgotado! Vencedor por WO.")
 			trucoState.waitingResponse = false
 			
+			-- Se o tempo acabar, quem ganha é quem pediu (o valor ANTERIOR ao pedido, pois não foi aceito)
+			-- Na verdade, regra de Truco: se estourar o tempo, é como se corresse.
 			local winnerTeam = (targetTeam == "A") and "B" or "A"
-			local points = trucoState.currentValue
-			handValue = points
+			-- Ganha o valor que estava valendo ANTES do pedido atual
+			handValue = trucoState.currentValue 
 			
 			Events.GameStatusEvent:FireAllClients("TRUCO_TIMEOUT", 0)
 			GameManager.WinHand(winnerTeam)
@@ -304,14 +336,20 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
 	local _, seatedPlayers = SeatManager.GetSeatedPlayers()
 	local myTeam = getTeamOfPlayer(player)
 
+	-- -------------------------
+	-- PEDIR / AUMENTAR
+	-- -------------------------
 	if action == "Request" then
+		-- Verifica se pode pedir
 		if trucoState.waitingResponse or trucoState.callerTeam == myTeam then return end
 		if trucoState.currentValue >= 12 then return end
 
+		-- Se o valor atual for 1, o próximo é 3. Senão, soma 3.
 		local nextValue = (trucoState.currentValue == 1) and 3 or (trucoState.currentValue + 3)
 		
 		trucoState.waitingResponse = true
 		trucoState.callerTeam = myTeam
+		trucoState.pendingValue = nextValue -- Valor proposto
 		trucoState.votes = {}
 		trucoState.challengeId = os.time()
 		
@@ -320,6 +358,7 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
 
 		Events.GameStatusEvent:FireAllClients("TRUCO_CALLED", nextValue)
 
+		-- Mostra menu para o time rival, esconde botão de quem pediu
 		for _, p in pairs(seatedPlayers) do
 			local pTeam = getTeamOfPlayer(p)
 			if pTeam ~= myTeam then
@@ -333,6 +372,9 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
 			end
 		end
 
+	-- -------------------------
+	-- RESPONDER (Aceitar/Correr/Aumentar)
+	-- -------------------------
 	elseif action == "Response" then
 		if not trucoState.waitingResponse then return end
 		
@@ -345,33 +387,55 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
 		
 		local partnerVote = partner and trucoState.votes[partner]
 		
-		if partnerVote == subAction then
+		-- Se os dois votaram igual (ou se estiver jogando 1x1 e o partner for nil, entra aqui tbm)
+		if partnerVote == subAction or partner == nil then
 			trucoState.waitingResponse = false
 			trucoState.votes = {}
 			
 			if subAction == "Aceitar" then
-				trucoState.currentValue = (trucoState.currentValue == 1) and 3 or (trucoState.currentValue + 3)
+				-- Confirma o novo valor
+				trucoState.currentValue = trucoState.pendingValue
 				handValue = trucoState.currentValue
 				trucoState.callerTeam = nil
 				
 				Events.GameStatusEvent:FireAllClients("TRUCO_ACEITO", handValue)
 				Events.GameStatusEvent:FireAllClients("UPDATE_ROUND_VALUE", handValue)
 				
+				-- ATUALIZA A VEZ DA JOGADA (Visual)
 				local currentPlayerName = getPlayerNameBySeat("Cadeira" .. currentTurnIndex)
 				Events.UpdateTurnEvent:FireAllClients(currentPlayerName, getCurrentTrickNumber())
 
+				-- CORREÇÃO CRUCIAL: TROCA DE PERMISSÃO
+				-- O time que ACEITOU ganha o direito de pedir o próximo aumento.
+				-- O time que PEDIU perde o direito.
+				local acceptingTeam = getTeamOfPlayer(player)
+				for _, p in pairs(seatedPlayers) do
+					if getTeamOfPlayer(p) == acceptingTeam then
+						Events.GameStatusEvent:FireClient(p, "SHOW_TRUCO_BTN")
+					else
+						Events.GameStatusEvent:FireClient(p, "HIDE_TRUCO_BTN")
+					end
+				end
+
 			elseif subAction == "Correr" then
+				-- Se correr, perde a mão. O vencedor ganha o valor ANTERIOR ao pedido.
 				local winnerTeam = (myTeam == "A") and "B" or "A"
-				handValue = trucoState.currentValue
+				-- Ex: Jogo vale 1. Pediu Truco (3). Correu. Ganha 1.
+				-- Ex: Jogo vale 3. Pediu Seis (6). Correu. Ganha 3.
+				handValue = trucoState.currentValue 
 				GameManager.WinHand(winnerTeam)
 
 			elseif subAction == "Aumentar" then
-				local proposedValue = (trucoState.currentValue == 1) and 3 or (trucoState.currentValue + 3)
-				local nextRaise = proposedValue + 3
+				-- Cálculo do Repique (ex: Pediu 3 -> Responde 6)
+				-- O valor proposto atual é trucoState.pendingValue
+				local nextRaise = trucoState.pendingValue + 3
 				if nextRaise > 12 then return end
 
-				trucoState.currentValue = proposedValue
-				trucoState.callerTeam = myTeam
+				-- Aumenta a aposta na pilha
+				-- Nota: Não atualizamos 'currentValue' ainda, só quando aceitarem.
+				trucoState.pendingValue = nextRaise
+				
+				trucoState.callerTeam = myTeam -- Agora quem pede é quem respondeu
 				trucoState.waitingResponse = true
 				trucoState.votes = {}
 				trucoState.challengeId = os.time()
@@ -395,6 +459,7 @@ Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
 				end
 			end
 		else
+			 -- Aguardando o parceiro votar
 			 Events.GameStatusEvent:FireClient(player, "WAITING_PARTNER", 0)
 		end
 	end

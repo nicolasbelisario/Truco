@@ -7,6 +7,7 @@ local lastEmoteTime = 0
 local EMOTE_COOLDOWN = 3
 
 local UIManager = require(script:WaitForChild("UIManager"))
+local TableVisuals = require(script:WaitForChild("TableVisuals"))
 local Events = ReplicatedStorage:WaitForChild("Events")
 
 UIManager.Init()
@@ -86,6 +87,7 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         local enemyTricks = (myTeam == "A") and data.TeamB or data.TeamA
         UIManager.UpdateRoundStats(currentPartner, myTricks, enemyTricks)
         UIManager.ClearTable()
+        TableVisuals.ClearTable()
 
     elseif message == "UPDATE_SCORE" then
         local myScore = (myTeam == "A") and data.TeamA or data.TeamB
@@ -112,6 +114,10 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
 
     elseif message == "SHOW_GAME_UI" then
         UIManager.SetGameplayUIVisibility(true)
+
+    elseif message == "MATCH_WON" then
+		UIManager.ShowMatchWinner(data)
+		UIManager.PlaySound("Victory")
         
     else
         UIManager.UpdateStatus(message, data)
@@ -122,6 +128,7 @@ Events.DealCards.OnClientEvent:Connect(function(mao, vira, partner)
     if partner then currentPartner = partner end
     UIManager.ClearHand() 
     UIManager.ClearTable()
+    TableVisuals.ClearTable()
     UIManager.SetVira(vira.Value, vira.Suit)
     UIManager.UpdateRoundStats(currentPartner, 0, 0)
     
@@ -137,6 +144,11 @@ end)
 Events.CardPlayedOnTable.OnClientEvent:Connect(function(playerName, value, suit, isHidden)
     UIManager.AddPlayedCardUI(playerName, value, suit, isHidden)
     UIManager.PlaySound("CardPlay")
+    
+    local p = game.Players:FindFirstChild(playerName)
+    if p then
+        TableVisuals.SpawnCard(p, value, suit, isHidden)
+    end
 end)
 
 local function trySendSignal(signalType)

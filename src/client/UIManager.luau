@@ -15,6 +15,7 @@ local GameSounds = {
 	["Shuffle"] = "rbxassetid://128706455708345", 
 	["Truco"] = "rbxassetid://7152989885", 
 	["CardPlay"] = "rbxassetid://3456145589",
+    ["Victory"] = "rbxassetid://12222253",
 }
 
 -- Variáveis Globais de UI
@@ -91,6 +92,7 @@ function UIManager.Init()
 	countdownLabel.TextScaled = true
 	countdownLabel.Font = Enum.Font.GothamBlack
 	countdownLabel.Text = ""
+    countdownLabel.ZIndex = 100
 	countdownLabel.Parent = screenGui
 
 	-- VIRA DISPLAY
@@ -624,34 +626,53 @@ function UIManager.ClearHand()
 	UIManager.SetCanTruco(true)
 end
 
+-- Função para atualizar o texto principal (topo da tela)
 function UIManager.UpdateStatus(msg, val)
-	if not isSeated or not countdownLabel then return end
-	local display = GameConfig.StateDisplayNames[msg] or msg
-	if val and val > 0 then
-		countdownLabel.Text = display .. " " .. val
-	else
-		countdownLabel.Text = display
-	end
+    -- CORREÇÃO: Removemos 'if not isSeated' para o texto aparecer sempre que o servidor mandar
+    if not countdownLabel then return end
+    
+    local display = GameConfig.StateDisplayNames[msg] or msg
+    
+    if val and val > 0 then
+        countdownLabel.Text = display .. " " .. val
+    else
+        countdownLabel.Text = display
+    end
+    
+    -- Garante que está visível e na frente
+    countdownLabel.Visible = true
+    countdownLabel.ZIndex = 100 
 end
 
+-- Função chamada quando troca o turno
 function UIManager.UpdateTurn(playerName, trickNumber) 
-	isMyTurn = (playerName == player.Name)
-	currentTrickNumber = trickNumber or 1 
-	
-	trucoBtn.Visible = isMyTurn and canITruco
-	
-	local currentVal = 1
-	if roundValueLabel and roundValueLabel.Text then
-		currentVal = tonumber(roundValueLabel.Text:match("%d+")) or 1
-	end
+    isMyTurn = (playerName == player.Name)
+    currentTrickNumber = trickNumber or 1 
+    
+    trucoBtn.Visible = isMyTurn and canITruco
+    
+    -- Atualiza texto do botão Truco
+    local currentVal = 1
+    if roundValueLabel and roundValueLabel.Text then
+        currentVal = tonumber(roundValueLabel.Text:match("%d+")) or 1
+    end
 
-	if currentVal == 1 then trucoBtn.Text = "TRUCO!"
-	elseif currentVal == 3 then trucoBtn.Text = "SEIS!"
-	elseif currentVal == 6 then trucoBtn.Text = "NOVE!"
-	elseif currentVal == 9 then trucoBtn.Text = "DOZE!"
-	else trucoBtn.Visible = false end
+    if currentVal == 1 then trucoBtn.Text = "TRUCO!"
+    elseif currentVal == 3 then trucoBtn.Text = "SEIS!"
+    elseif currentVal == 6 then trucoBtn.Text = "NOVE!"
+    elseif currentVal == 9 then trucoBtn.Text = "DOZE!"
+    else trucoBtn.Visible = false end
 
-	UIManager.UpdateStatus(isMyTurn and "SUA VEZ!" or "Vez de: " .. playerName, 0)
+    -- ATUALIZA O STATUS AQUI
+    if isMyTurn then
+        UIManager.UpdateStatus("SUA VEZ!", 0)
+        -- Destaque visual: Texto Amarelo quando é sua vez
+        countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    else
+        UIManager.UpdateStatus("Vez de: " .. playerName, 0)
+        -- Texto Branco normal na vez dos outros
+        countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
 end
 
 function UIManager.SetSeated(s)
@@ -822,6 +843,61 @@ function UIManager.PlaySound(soundName)
 	end)
 	
 	sound:Play()
+end
+
+function UIManager.ShowMatchWinner(text)
+	-- 1. Frame APENAS para escurecer o fundo
+	local darkenBG = Instance.new("Frame")
+	darkenBG.Name = "VictoryDarkenBG"
+	darkenBG.Size = UDim2.new(1, 0, 1, 0)
+	darkenBG.BackgroundColor3 = Color3.new(0, 0, 0)
+	darkenBG.BackgroundTransparency = 1 -- Começa invisível
+	darkenBG.ZIndex = 200 -- Fica na frente do jogo
+	darkenBG.Parent = screenGui
+	
+	-- 2. O Texto de Vitória (Separado do fundo escuro)
+	local lbl = Instance.new("TextLabel")
+	lbl.Name = "VictoryLabel"
+	lbl.Text = text
+	lbl.Size = UDim2.new(0.9, 0, 0.2, 0)
+	lbl.Position = UDim2.new(0.5, 0, 0.5, 0)
+	lbl.AnchorPoint = Vector2.new(0.5, 0.5)
+	lbl.BackgroundTransparency = 1
+	lbl.TextColor3 = Color3.fromRGB(255, 215, 0) -- Dourado brilhante
+	lbl.Font = Enum.Font.GothamBlack
+	lbl.TextScaled = true
+	lbl.TextTransparency = 1 -- Começa invisível
+	lbl.ZIndex = 201 -- FICA NA FRENTE DO FUNDO ESCURO
+	lbl.Parent = screenGui -- Parente direto do ScreenGui
+	
+	-- Efeito de Borda no Texto
+	local stroke = Instance.new("UIStroke", lbl)
+	stroke.Thickness = 3
+	stroke.Color = Color3.new(1, 1, 1) -- Borda branca para destacar
+	stroke.Transparency = 1
+	
+	-- Animação 1: Escurece o fundo
+	TweenService:Create(darkenBG, TweenInfo.new(1), {BackgroundTransparency = 0.3}):Play()
+	
+	-- Animação 2: Texto aparece e cresce (Pop-in)
+	local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+	TweenService:Create(lbl, tweenInfo, {TextTransparency = 0, Size = UDim2.new(0.95, 0, 0.25, 0)}):Play()
+	TweenService:Create(stroke, TweenInfo.new(1), {Transparency = 0}):Play()
+	
+	-- Some tudo depois de 9 segundos
+	task.delay(9, function()
+		-- Anima a saída
+		TweenService:Create(darkenBG, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
+		local textFadeOut = TweenService:Create(lbl, TweenInfo.new(0.5), {TextTransparency = 1})
+		TweenService:Create(stroke, TweenInfo.new(0.5), {Transparency = 1}):Play()
+		textFadeOut:Play()
+		
+		-- Destrói quando terminar a animação
+		textFadeOut.Completed:Connect(function()
+			darkenBG:Destroy()
+			lbl:Destroy()
+		end)
+	end)
 end
 
 return UIManager
