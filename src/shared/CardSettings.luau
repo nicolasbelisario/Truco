@@ -2,7 +2,7 @@ local CardSettings = {
     Suits = {"Ouros", "Espadas", "Copas", "Paus"},
     -- Sequência de força para o Truco Paulista (do mais fraco para o mais forte, sem contar manilhas)
     Values = {"4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"},
-    ManilhaFixa = false -- Paulista usa manilha variável (Vira)
+    ManilhaFixa = false, -- Paulista usa manilha variável (Vira)
 
 	Images = {
         ["A_Ouros"] = "rbxassetid://72779219971553",
@@ -37,7 +37,7 @@ local CardSettings = {
         ["K_Copas"] = "rbxassetid://131020818518198",
         ["A_Paus"] = "rbxassetid://132246255647386",
         ["2_Paus"] = "rbxassetid://136619988651279",
-        ["3_Paus"] = "rbxassetid://78698147741795",
+        ["3_Paus"] = "rbxassetid://126622291518117",
         ["4_Paus"] = "rbxassetid://135845300363752",
         ["5_Paus"] = "rbxassetid://131599038231315",
         ["6_Paus"] = "rbxassetid://81379655491234",
@@ -45,6 +45,7 @@ local CardSettings = {
         ["Q_Paus"] = "rbxassetid://129742460118836",
         ["J_Paus"] = "rbxassetid://127170396211262",
         ["K_Paus"] = "rbxassetid://126545231348669",
+		["CardBack"] = "rbxassetid://136268985865709",
 	}
 }
 

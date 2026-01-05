@@ -3,6 +3,8 @@ local UserInputService = game:GetService("UserInputService")
 local player = game.Players.LocalPlayer
 local currentPartner = "Ninguém"
 local myTeam = "A"
+local lastEmoteTime = 0
+local EMOTE_COOLDOWN = 3
 
 local UIManager = require(script:WaitForChild("UIManager"))
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -63,6 +65,7 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         
     elseif message == "DEALING" then
         UIManager.HideCutMenu()
+        UIManager.PlaySound("Shuffle")
 
     -- 3. EVENTOS DE VITÓRIA E ESTADO
     elseif message == "TRUCO_ACEITO" then
@@ -96,6 +99,7 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         -- IMPORTANTE: Se o Truco foi pedido/aumentado, fecha o menu anterior imediatamente
         UIManager.HideTrucoChallenge() 
         UIManager.UpdateStatus("TRUCO! Vale " .. data, 0)
+        UIManager.PlaySound("Truco")
 
     elseif message == "SHOW_SCOREBOARD" then
         UIManager.ShowScoreboard()
@@ -126,13 +130,29 @@ Events.DealCards.OnClientEvent:Connect(function(mao, vira, partner)
     end
 end)
 
-Events.UpdateTurnEvent.OnClientEvent:Connect(function(playerName)
-    UIManager.UpdateTurn(playerName)
+Events.UpdateTurnEvent.OnClientEvent:Connect(function(playerName, trickNumber)
+    UIManager.UpdateTurn(playerName, trickNumber)
 end)
 
-Events.CardPlayedOnTable.OnClientEvent:Connect(function(playerName, value, suit)
-    UIManager.AddPlayedCardUI(playerName, value, suit)
+Events.CardPlayedOnTable.OnClientEvent:Connect(function(playerName, value, suit, isHidden)
+    UIManager.AddPlayedCardUI(playerName, value, suit, isHidden)
+    UIManager.PlaySound("CardPlay")
 end)
+
+local function trySendSignal(signalType)
+    local now = tick()
+    if now - lastEmoteTime >= EMOTE_COOLDOWN then
+        lastEmoteTime = now
+        Events.SignalEvent:FireServer(signalType)
+        
+        -- Feedback visual de cooldown (opcional)
+        -- print("Sinal enviado: " .. signalType)
+    else
+        -- print("Aguarde para enviar outro sinal...")
+    end
+end
+
+UIManager.SetEmoteCallback(trySendSignal)
 
 Events.SignalEvent.OnClientEvent:Connect(function(sender, signalType)
     UIManager.ShowSignal(sender, signalType)
@@ -141,8 +161,8 @@ end)
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.Q then 
-        Events.SignalEvent:FireServer("Sinal_Mao")
+        trySendSignal("Sinal_Mao")
     elseif input.KeyCode == Enum.KeyCode.E then 
-        Events.SignalEvent:FireServer("Sinal_Olhar") 
+        trySendSignal("Sinal_Olhar") 
     end
 end)
