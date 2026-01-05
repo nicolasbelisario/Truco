@@ -1,28 +1,47 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
-local player = game.Players.LocalPlayer
-local currentPartner = "Ninguém"
-local myTeam = "A"
-local lastEmoteTime = 0
-local EMOTE_COOLDOWN = 3
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
 local UIManager = require(script:WaitForChild("UIManager"))
 local TableVisuals = require(script:WaitForChild("TableVisuals"))
 local Events = ReplicatedStorage:WaitForChild("Events")
 
+local currentPartner = "Ninguém"
+local myTeam = "A"
+local lastEmoteTime = 0
+local EMOTE_COOLDOWN = 3
+
 UIManager.Init()
+
+-- Identifica em qual cadeira o jogador local está sentado
+-- No init.client.luau
 
 local function updateSitStatus(isSitting)
     UIManager.SetSeated(isSitting)
     if isSitting then
         local char = player.Character
         if char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
-            local seatName = char.Humanoid.SeatPart.Parent.Name
+            local seatPart = char.Humanoid.SeatPart
+            local seatName = seatPart.Parent.Name -- Ex: Cadeira1
+            
+            local tableModel = seatPart.Parent.Parent.Parent 
+            
+            -- Debug opcional para verificar se pegou o Model certo
+            print("Sentei na mesa:", tableModel.Name) 
+
+            TableVisuals.SetCurrentTable(tableModel)
+            
             UIManager.SetMySeat(seatName)
             
             local seatNum = tonumber(seatName:match("%d+"))
-            myTeam = (seatNum % 2 == 1) and "A" or "B"
+            if seatNum then
+                myTeam = (seatNum % 2 == 1) and "A" or "B"
+            end
         end
+    else
+        -- Se levantar, limpa a referência da mesa
+        TableVisuals.SetCurrentTable(nil)
     end
 end
 
@@ -35,18 +54,34 @@ if player.Character and player.Character:FindFirstChild("Humanoid") then
     updateSitStatus(player.Character.Humanoid.Sit)
 end
 
+-- --- EVENTOS DE JOGO ---
+
 Events.RequestAction.OnClientEvent:Connect(function(actionType, data)
     if actionType == "EscolhaOCorte" then 
         UIManager.ShowCutOptions(data) 
     elseif actionType == "TrucoChallenge" then
-        -- data: {Value, Caller, TimeLimit}
+        -- data: {Value, Caller (string), TimeLimit}
         UIManager.ShowTrucoChallenge(data.Value, data.Caller, data.TimeLimit)
     end
 end)
 
 Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
-    -- 1. SISTEMA DE VOTAÇÃO E TRUCO
-    if message == "PARTNER_VOTED" then
+    
+    -- 1. MONITORAMENTO DE ESTADO (Para liberar/bloquear cliques)
+    -- Se o Truco foi aceito ou a rodada acabou, libera o jogo
+    if message == "TRUCO_ACEITO" or message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
+        isTrucoPending = false 
+    end
+
+    -- 2. LÓGICA DE UI
+    if message == "TRUCO_CALLED" then
+        -- Lógica Nova: Bloqueia e avisa
+        isTrucoPending = true 
+        UIManager.HideTrucoChallenge() 
+        UIManager.UpdateStatus("TRUCO! Vale " .. data, 0)
+        UIManager.PlaySound("Truco")
+        
+    elseif message == "PARTNER_VOTED" then
         UIManager.UpdateChallengeStatus("Parceiro quer: " .. string.upper(data))
     
     elseif message == "WAITING_PARTNER" then
@@ -55,10 +90,8 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
     elseif message == "TRUCO_TIMEOUT" then
         UIManager.HideTrucoChallenge()
 
-    -- 2. CONTROLES DE UI
     elseif message == "HIDE_TRUCO_BTN" then
         UIManager.SetCanTruco(false)
-        -- SE O BOTÃO DE TRUCO SUMIU (PQ VC OU PARCEIRO AUMENTARAM), O MENU DEVE SUMIR TAMBÉM
         UIManager.HideTrucoChallenge()
         
     elseif message == "SHOW_TRUCO_BTN" then
@@ -68,24 +101,23 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         UIManager.HideCutMenu()
         UIManager.PlaySound("Shuffle")
 
-    -- 3. EVENTOS DE VITÓRIA E ESTADO
     elseif message == "TRUCO_ACEITO" then
         UIManager.HideTrucoChallenge()
-        if UIManager.ResetCamera then UIManager.ResetCamera() end
+        UIManager.ResetCamera()
         UIManager.UpdateStatus("TRUCO ACEITO! Vale " .. data, 0)
 
     elseif message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
         UIManager.HideTrucoChallenge()
-        if UIManager.ResetCamera then UIManager.ResetCamera() end
-        
+        UIManager.ResetCamera()
         local teamResult = (message == "TEAM_A_WON_HAND") and "DUPLA A" or "DUPLA B"
         UIManager.ShowRoundWinner(teamResult)
 
-    -- 4. ATUALIZAÇÕES GERAIS
     elseif message == "CLEAR_TABLE" then
+        -- Stats da rodada
         local myTricks = (myTeam == "A") and data.TeamA or data.TeamB
         local enemyTricks = (myTeam == "A") and data.TeamB or data.TeamA
         UIManager.UpdateRoundStats(currentPartner, myTricks, enemyTricks)
+        
         UIManager.ClearTable()
         TableVisuals.ClearTable()
 
@@ -97,11 +129,7 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
     elseif message == "UPDATE_ROUND_VALUE" then
         UIManager.UpdateRoundValue(data)
 
-    elseif message == "TRUCO_CALLED" then
-        -- IMPORTANTE: Se o Truco foi pedido/aumentado, fecha o menu anterior imediatamente
-        UIManager.HideTrucoChallenge() 
-        UIManager.UpdateStatus("TRUCO! Vale " .. data, 0)
-        UIManager.PlaySound("Truco")
+    -- OBS: Removi o "TRUCO_CALLED" que estava duplicado aqui embaixo
 
     elseif message == "SHOW_SCOREBOARD" then
         UIManager.ShowScoreboard()
@@ -116,19 +144,25 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         UIManager.SetGameplayUIVisibility(true)
 
     elseif message == "MATCH_WON" then
-		UIManager.ShowMatchWinner(data)
-		UIManager.PlaySound("Victory")
+        UIManager.ShowMatchWinner(data)
+        UIManager.PlaySound("Victory")
+        
+    elseif message == "CUTTING" then
+        -- Adicionando para garantir que o cliente saiba
+        UIManager.UpdateStatus("Aguardando corte...", 0)
         
     else
         UIManager.UpdateStatus(message, data)
     end
 end)
 
-Events.DealCards.OnClientEvent:Connect(function(mao, vira, partner)
-    if partner then currentPartner = partner end
+Events.DealCards.OnClientEvent:Connect(function(mao, vira, partnerName)
+    if partnerName then currentPartner = partnerName end
+    
     UIManager.ClearHand() 
     UIManager.ClearTable()
     TableVisuals.ClearTable()
+    
     UIManager.SetVira(vira.Value, vira.Suit)
     UIManager.UpdateRoundStats(currentPartner, 0, 0)
     
@@ -142,32 +176,41 @@ Events.UpdateTurnEvent.OnClientEvent:Connect(function(playerName, trickNumber)
 end)
 
 Events.CardPlayedOnTable.OnClientEvent:Connect(function(playerName, value, suit, isHidden)
+    -- Atualiza UI 2D (Isso já funcionava)
     UIManager.AddPlayedCardUI(playerName, value, suit, isHidden)
     UIManager.PlaySound("CardPlay")
     
-    local p = game.Players:FindFirstChild(playerName)
+    -- Atualiza Visual 3D
+    local p = Players:FindFirstChild(playerName)
+    
     if p then
+        -- É um jogador real
         TableVisuals.SpawnCard(p, value, suit, isHidden)
+    else
+        -- >>> ALTERAÇÃO AQUI <<<
+        -- Se não achou em Players, assume que é um BOT e passa a String (nome)
+        TableVisuals.SpawnCard(playerName, value, suit, isHidden)
     end
 end)
+
+-- --- SINAIS ---
 
 local function trySendSignal(signalType)
     local now = tick()
     if now - lastEmoteTime >= EMOTE_COOLDOWN then
         lastEmoteTime = now
         Events.SignalEvent:FireServer(signalType)
-        
-        -- Feedback visual de cooldown (opcional)
-        -- print("Sinal enviado: " .. signalType)
-    else
-        -- print("Aguarde para enviar outro sinal...")
     end
 end
 
 UIManager.SetEmoteCallback(trySendSignal)
 
 Events.SignalEvent.OnClientEvent:Connect(function(sender, signalType)
-    UIManager.ShowSignal(sender, signalType)
+    -- Sender pode ser um Player ou uma String (se vier modificado do servidor para bots)
+    -- Mas no nosso Match atual, bots não mandam emotes.
+    if typeof(sender) == "Instance" and sender:IsA("Player") then
+        UIManager.ShowSignal(sender, signalType)
+    end
 end)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
@@ -178,3 +221,40 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         trySendSignal("Sinal_Olhar") 
     end
 end)
+
+-- ... (seu código existente no init.client.luau) ...
+
+-- --- SISTEMA DE MÚSICA DE FUNDO (BGM) ---
+local SoundService = game:GetService("SoundService")
+
+-- Lista de IDs (Instrumentais/Relax/Jazz para não atrapalhar o Truco)
+local musicPlaylist = {
+    "rbxassetid://1845341094", -- Chill Jazz    https://create.roblox.com/store/asset/1845341094/
+    "rbxassetid://1848354536", -- Relaxed Scene https://create.roblox.com/store/asset/1848354536/
+    "rbxassetid://1837429944", -- Soft Music    https://create.roblox.com/store/asset/1837429944/
+    "rbxassetid://9043887091", -- Lo-Fi Chill A https://create.roblox.com/store/asset/9043887091/
+    "rbxassetid://1838457617", -- Clair de Lune https://create.roblox.com/store/asset/1838457617/
+}
+
+local bgmObj = Instance.new("Sound")
+bgmObj.Name = "BackgroundMusic"
+bgmObj.Parent = SoundService
+bgmObj.Volume = 0.3 -- Volume baixinho para não atrapalhar os efeitos de carta
+bgmObj.Looped = false -- Deixe false para podermos trocar de música quando acabar
+
+local function playNextSong()
+    -- Escolhe uma música aleatória da lista
+    local randomId = musicPlaylist[math.random(1, #musicPlaylist)]
+    bgmObj.SoundId = randomId
+    
+    if not bgmObj.IsLoaded then
+        bgmObj.Loaded:Wait()
+    end
+    bgmObj:Play()
+end
+
+-- Quando a música acabar, toca a próxima
+bgmObj.Ended:Connect(playNextSong)
+
+-- Começa a tocar a primeira
+task.spawn(playNextSong)

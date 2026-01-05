@@ -1,147 +1,199 @@
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
+local Players = game:GetService("Players") -- Necessário
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CardSettings = require(Shared:WaitForChild("CardSettings"))
 
 local TableVisuals = {}
 
 -- CONFIGURAÇÕES VISUAIS
--- DEFINITIVO: Formato RETRATO (Mais comprido no Z).
--- X = Largura (Curto), Y = Espessura, Z = Altura (Comprido)
 local CARD_SIZE = Vector3.new(1.05, 0.02, 0.7) 
 local TWEEN_INFO = TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
--- REFERÊNCIAS
-local mesaFolder = workspace:WaitForChild("MesaTruco")
-local cartasContainer = mesaFolder:WaitForChild("CartasNaMesa")
-local cadeirasFolder = mesaFolder:WaitForChild("Cadeiras")
-local mesaModel = mesaFolder:WaitForChild("Mesa")
-local tampoMesa = mesaModel:WaitForChild("Topo") 
+-- Variáveis da Mesa Atual
+local currentTableFolder = nil
+local cartasContainer = nil
+local cadeirasFolder = nil
+local mesaModel = nil
+local tampoMesa = nil
 
--- Posições Finais na Mesa
--- Como a Part agora é "Retrato" (comprida no Z), precisamos girar a Part em 90 graus no Y
--- para ela ficar deitada de lado para os jogadores 2 e 4.
+-- Posições Relativas (Offsets)
 local POSICOES_MESA = {
-	[1] = CFrame.new(0, 0.05, 1.2),   -- Jogador 1 (Frente) -> Carta Reta
-	[2] = CFrame.new(1.2, 0.05, 0) * CFrame.Angles(0, math.rad(90), 0), -- Jogador 2 (Direita) -> Gira 90 graus
-	[3] = CFrame.new(0, 0.05, -1.2) * CFrame.Angles(0, math.rad(180), 0), -- Jogador 3 (Frente oposta) -> Gira 180
-	[4] = CFrame.new(-1.2, 0.05, 0) * CFrame.Angles(0, math.rad(-90), 0), -- Jogador 4 (Esquerda) -> Gira -90
+    [1] = CFrame.new(0, 0.05, 1.2),
+    [2] = CFrame.new(1.2, 0.05, 0) * CFrame.Angles(0, math.rad(90), 0),
+    [3] = CFrame.new(0, 0.05, -1.2) * CFrame.Angles(0, math.rad(180), 0),
+    [4] = CFrame.new(-1.2, 0.05, 0) * CFrame.Angles(0, math.rad(-90), 0),
 }
 
-local function GetPlayerSeatNumber(player)
-	for _, seat in ipairs(cadeirasFolder:GetChildren()) do
-		if seat:IsA("Seat") and seat.Occupant and seat.Occupant.Parent == player.Character then
-			return tonumber(seat.Name:match("%d+"))
-		end
-	end
-	return nil
+function TableVisuals.SetCurrentTable(tableModel)
+    if not tableModel then
+        currentTableFolder = nil
+        return
+    end
+    currentTableFolder = tableModel
+    
+    -- Tenta achar os containers
+    cartasContainer = currentTableFolder:FindFirstChild("CartasNaMesa")
+    cadeirasFolder = currentTableFolder:FindFirstChild("Cadeiras")
+    mesaModel = currentTableFolder:FindFirstChild("Mesa") 
+    
+    if mesaModel then
+        tampoMesa = mesaModel:FindFirstChild("Topo")
+    end
+
+    -- DEBUG: Avisa se faltar algo essencial
+    if not cartasContainer then warn("TableVisuals: Pasta 'CartasNaMesa' não encontrada em " .. tableModel.Name) end
+    if not tampoMesa then warn("TableVisuals: Part 'Topo' não encontrada em " .. tableModel.Name) end
 end
 
-local function GetBestSeatPosition(player)
-	local char = player.Character
-	if not char or not char.PrimaryPart then return 1 end
-	local seatNum = GetPlayerSeatNumber(player)
-	if seatNum then return seatNum end
-	local shortestDist = math.huge
-	local bestSeat = 1
-	for _, seat in ipairs(cadeirasFolder:GetChildren()) do
-		if seat:IsA("Part") or seat:IsA("Seat") then
-			local dist = (seat.Position - char.PrimaryPart.Position).Magnitude
-			if dist < shortestDist then
-				shortestDist = dist
-				bestSeat = tonumber(seat.Name:match("%d+")) or 1
-			end
-		end
-	end
-	return bestSeat
+-- Função auxiliar para localizar o Bot Visual na mesa
+local function FindBotCharacterInTable(botName)
+    if not cadeirasFolder then return nil end
+    
+    -- Procura dentro de cada cadeira
+    for _, seatContainer in ipairs(cadeirasFolder:GetChildren()) do
+        -- O bot visual costuma ser filho da Cadeira (ex: Cadeira2 -> Bot Rival 1)
+        local botModel = seatContainer:FindFirstChild(botName)
+        if botModel then return botModel end
+    end
+    return nil
 end
 
-function TableVisuals.SpawnCard(player, rank, suit, isHidden)
-	-- 1. Parte Física
-	local cardPart = Instance.new("Part")
-	cardPart.Name = "Card_" .. player.Name
-	cardPart.Size = CARD_SIZE
-	cardPart.Material = Enum.Material.Plastic
-	cardPart.Color = Color3.new(1, 1, 1)
-	cardPart.Anchored = true
-	cardPart.CanCollide = false
-	cardPart.CastShadow = true
-	
-	-- 2. Textura (SurfaceGui)
-	local surfaceGui = Instance.new("SurfaceGui")
-	surfaceGui.Face = Enum.NormalId.Top
-	-- CanvasSize garante que o Roblox não tente esticar a imagem erraticamente
-	surfaceGui.CanvasSize = Vector2.new(700, 1050) -- Proporção aproximada 2:3
-	surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-	surfaceGui.Parent = cardPart
-	
-	local imgLabel = Instance.new("ImageLabel")
-	imgLabel.Size = UDim2.new(1, 0, 1, 0)
-	imgLabel.BackgroundTransparency = 1
-	imgLabel.ScaleType = Enum.ScaleType.Fit -- Garante que a imagem caiba inteira
-	
-	-- CORREÇÃO PRINCIPAL: Rotação ZERO. A imagem entra reta na peça.
-	imgLabel.Rotation = 0 
-	imgLabel.Parent = surfaceGui
-	
-	if isHidden then
-		imgLabel.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
-	else
-		local key = rank .. "_" .. suit
-		imgLabel.Image = CardSettings.Images[key] or ""
-	end
-	
-	-- (Opcional) Verso da carta
-	local backSurface = surfaceGui:Clone()
-	backSurface.Face = Enum.NormalId.Bottom
-	backSurface.Parent = cardPart
-	backSurface.ImageLabel.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
+-- Função inteligente que descobre a cadeira baseada no Jogador OU Nome do Bot
+local function GetSeatNumberFromTarget(target)
+    if not cadeirasFolder then return 1 end
+    
+    for _, seatContainer in ipairs(cadeirasFolder:GetChildren()) do
+        local seatName = seatContainer.Name -- "Cadeira1"
+        local seatNum = tonumber(seatName:match("%d+"))
+        
+        -- Verifica se tem Seat object
+        local seatObject = seatContainer:FindFirstChildWhichIsA("Seat") or seatContainer
+        
+        if typeof(target) == "Instance" and target:IsA("Player") then
+            -- Lógica para Jogador Real
+            if seatObject:IsA("Seat") and seatObject.Occupant and seatObject.Occupant.Parent == target.Character then
+                return seatNum
+            end
+        elseif type(target) == "string" then
+            -- Lógica para BOT (String)
+            -- Verifica se o nome do Bot está dentro dessa pasta de cadeira
+            if seatContainer:FindFirstChild(target) then
+                return seatNum
+            end
+        end
+    end
+    return nil -- Não achou
+end
 
-	-- 3. Posição Inicial
-	local startPos = tampoMesa.Position + Vector3.new(0, 5, 0)
-	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-		startPos = player.Character.HumanoidRootPart.Position + (player.Character.HumanoidRootPart.CFrame.LookVector * 2)
-	end
-	
-	cardPart.Position = startPos
-	
-	-- Começa "reta" (sem girar no eixo Z ou X para não ficar de lado), apenas rotação aleatória no Y (giro de mesa)
-	cardPart.CFrame = CFrame.new(startPos) * CFrame.Angles(0, math.rad(math.random(0,360)), 0)
-	cardPart.Parent = cartasContainer
-	
-	-- 4. Destino
-	local seatNum = GetBestSeatPosition(player)
-	local centroMesa = tampoMesa.Position
-	local alturaFinal = centroMesa.Y + (tampoMesa.Size.Y / 2) + (CARD_SIZE.Y / 2)
-	
-	-- Offset base para onde a carta vai (relativo ao centro)
-	local targetBaseCFrame = POSICOES_MESA[seatNum] or CFrame.new(0,0,0)
-	
-	-- "Bagunça" natural: gira um pouquinho a carta para ela não ficar 100% alinhada roboticamente
-	local randomMessyRotation = CFrame.Angles(0, math.rad(math.random(-20, 20)), 0)
-	
-	-- Monta o CFrame final
-	local finalPos = Vector3.new(centroMesa.X, alturaFinal, centroMesa.Z)
-	
-	-- A ordem de multiplicação importa: Posição * Rotação do Lugar * Rotação da "Bagunça"
-	local finalCFrame = CFrame.new(finalPos) * targetBaseCFrame * randomMessyRotation
-	
-	local tween = TweenService:Create(cardPart, TWEEN_INFO, {CFrame = finalCFrame})
-	tween:Play()
+-- SpawnCard agora aceita (Player Instance) OU (String Name)
+function TableVisuals.SpawnCard(playerOrName, rank, suit, isHidden)
+	-- DEBUG: Verifica se tudo foi inicializado antes de tentar spawnar
+    if not currentTableFolder then 
+        warn("TableVisuals: Tentativa de SpawnCard sem mesa definida (currentTableFolder is nil)")
+        return 
+    end
+    if not cartasContainer or not tampoMesa then 
+        warn("TableVisuals: Impossível spawnar carta. CartasNaMesa ou TampoMesa não encontrados.")
+        return 
+    end
+
+    if not currentTableFolder or not cartasContainer or not tampoMesa then return end
+
+    local character = nil
+    local playerName = ""
+    local seatNum = 1
+
+    -- 1. Identificar quem é e onde está
+    if typeof(playerOrName) == "Instance" and playerOrName:IsA("Player") then
+        playerName = playerOrName.Name
+        character = playerOrName.Character
+        seatNum = GetSeatNumberFromTarget(playerOrName) or 1
+    elseif type(playerOrName) == "string" then
+        playerName = playerOrName
+        character = FindBotCharacterInTable(playerName)
+        seatNum = GetSeatNumberFromTarget(playerName) or 2 -- Fallback
+    end
+
+    -- 2. Criação da Carta
+    local cardPart = Instance.new("Part")
+    cardPart.Name = "Card_" .. playerName
+    cardPart.Size = CARD_SIZE
+    cardPart.Material = Enum.Material.Plastic
+    cardPart.Color = Color3.new(1, 1, 1)
+    cardPart.Anchored = true
+    cardPart.CanCollide = false
+    cardPart.CastShadow = true
+    
+    local surfaceGui = Instance.new("SurfaceGui")
+    surfaceGui.Face = Enum.NormalId.Top
+    surfaceGui.CanvasSize = Vector2.new(700, 1050)
+    surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+    surfaceGui.Parent = cardPart
+    
+    local imgLabel = Instance.new("ImageLabel")
+    imgLabel.Size = UDim2.new(1, 0, 1, 0)
+    imgLabel.BackgroundTransparency = 1
+    imgLabel.ScaleType = Enum.ScaleType.Fit
+    imgLabel.Parent = surfaceGui
+    
+    if isHidden then
+        imgLabel.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
+    else
+        local key = rank .. "_" .. suit
+        imgLabel.Image = CardSettings.Images[key] or ""
+    end
+    
+    local backSurface = surfaceGui:Clone()
+    backSurface.Face = Enum.NormalId.Bottom
+    backSurface.Parent = cardPart
+    backSurface.ImageLabel.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
+
+    -- 3. Posição Inicial (Sai do peito/mão do personagem)
+    local startPos = tampoMesa.Position + Vector3.new(0, 4, 0)
+    
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local hrp = character.HumanoidRootPart
+        -- Faz a carta sair um pouco a frente do boneco
+        startPos = hrp.Position + (hrp.CFrame.LookVector * 1.5)
+    end
+    
+    cardPart.Position = startPos
+    -- Rotação aleatória inicial para dar efeito
+    cardPart.CFrame = CFrame.new(startPos) * CFrame.Angles(math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)), 0)
+    cardPart.Parent = cartasContainer
+    
+    -- 4. Animação para o Destino
+    local centroMesa = tampoMesa.Position
+    local alturaFinal = centroMesa.Y + (tampoMesa.Size.Y / 2) + (CARD_SIZE.Y / 2)
+    
+    local targetBaseCFrame = POSICOES_MESA[seatNum] or CFrame.new(0,0,0)
+    -- Adiciona uma rotaçãozinha bagunçada para parecer natural
+    local randomMessyRotation = CFrame.Angles(0, math.rad(math.random(-15, 15)), 0)
+    
+    local finalPos = Vector3.new(centroMesa.X, alturaFinal, centroMesa.Z)
+    local finalCFrame = CFrame.new(finalPos) * targetBaseCFrame * randomMessyRotation
+    
+    local tween = TweenService:Create(cardPart, TWEEN_INFO, {CFrame = finalCFrame})
+    tween:Play()
+    
+    -- Opcional: Efeito sonoro 3D na carta
+    -- local sound = Instance.new("Sound", cardPart) ...
 end
 
 function TableVisuals.ClearTable()
-	for _, child in ipairs(cartasContainer:GetChildren()) do
-		if child:IsA("BasePart") then
-			local tween = TweenService:Create(child, TweenInfo.new(0.5), {
-				Transparency = 1, 
-				Position = child.Position + Vector3.new(0, 2, 0)
-			})
-			tween:Play()
-			Debris:AddItem(child, 0.5)
-		end
-	end
+    if not cartasContainer then return end
+    for _, child in ipairs(cartasContainer:GetChildren()) do
+        if child:IsA("BasePart") then
+            local tween = TweenService:Create(child, TweenInfo.new(0.5), {
+                Transparency = 1, 
+                Position = child.Position + Vector3.new(0, 1, 0)
+            })
+            tween:Play()
+            Debris:AddItem(child, 0.5)
+        end
+    end
 end
 
 return TableVisuals
