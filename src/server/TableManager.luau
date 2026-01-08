@@ -6,16 +6,28 @@ local TableManager = {}
 local matches = {} -- [Model] = MatchInstance
 local playerToMatch = {} -- [Player] = MatchInstance
 
+-- CONFIGURAÇÃO DOS BOTS POR NOME DA MESA
+-- Define quais cadeiras serão ocupadas por BOTS.
+-- As cadeiras que não estiverem na lista ficam livres para humanos.
+local BOT_CONFIGS = {
+    ["MesaPvE_Solo"] = {2, 3, 4}, -- 1 Humano vs 3 Bots (Padrão)
+    ["MesaPvE_Dupla"] = {2, 4},   -- 2 Humanos (1 e 3) vs 2 Bots (2 e 4)
+    ["MesaPvE_Trio"] = {4},       -- 3 Humanos (1, 2, 3) vs 1 Bot (4)
+}
+
 function TableManager.Init(folder)
     for _, mesaModel in ipairs(folder:GetChildren()) do
-        -- Verifica se é a mesa de bots pelo nome
-        local isBotTable = (mesaModel.Name == "MesaBots")
         
-        -- Cria uma nova instância de partida para esta mesa
-        local match = Match.new(mesaModel, isBotTable)
+        -- Verifica se o nome da mesa existe na nossa configuração
+        local botSeats = BOT_CONFIGS[mesaModel.Name]
+        
+        -- Se botSeats não for nil, é uma mesa PvE. Se for nil, é PvP normal (lista vazia).
+        local configToPass = botSeats or {}
+        
+        -- Cria a partida passando a lista de cadeiras de bot
+        local match = Match.new(mesaModel, configToPass)
         matches[mesaModel] = match
         
-        -- Escuta quando jogadores sentam/levantam (Delegado para a classe Match)
         match.OnPlayerJoin = function(player)
             playerToMatch[player] = match
         end

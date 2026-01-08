@@ -685,6 +685,7 @@ function UIManager.SetGameplayUIVisibility(visible)
     if statsFrame then statsFrame.Visible = visible end
     if gameScoreLabel then gameScoreLabel.Visible = visible end
     if viraDisplay then viraDisplay.Visible = visible end
+    if roundValueLabel then roundValueLabel.Visible = visible end
     if trucoBtn then trucoBtn.Visible = false end
     if cutFrame then cutFrame.Visible = false end
 end

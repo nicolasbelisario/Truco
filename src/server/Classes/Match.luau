@@ -14,11 +14,13 @@ local Match = {}
 Match.__index = Match
 
 -- Construtor da Classe Match
-function Match.new(model, useBots)
+function Match.new(model, botSeatsList)
     local self = setmetatable({}, Match)
     
     self.Model = model
-    self.UseBots = useBots
+    
+    self.BotSeats = botSeatsList or {} 
+    self.UseBots = (#self.BotSeats > 0) -- Se a lista tem algo, é modo Bot
     
     -- Estado da Partida
     self.State = "WAITING"
@@ -94,26 +96,28 @@ function Match:SetupSeats()
 end
 
 -- Inicializa Bots nas cadeiras 2, 3 e 4 se for mesa de Bot
--- Substitua a função InitializeBots atual por esta:
 function Match:InitializeBots()
-    -- Configuração de nomes amigáveis
-    local botNames = {
-        [2] = "Bot Rival 1",    -- Cadeira 2 (Direita)
-        [3] = "Bot Parceiro",   -- Cadeira 3 (Frente/Sua Dupla)
-        [4] = "Bot Rival 2"     -- Cadeira 4 (Esquerda)
+    -- Nomes genéricos baseados na posição
+    local botNamesMap = {
+        [1] = "Bot 1",
+        [2] = "Bot Rival 1",
+        [3] = "Bot Parceiro",
+        [4] = "Bot Rival 2"
     }
 
-    -- Assume que o jogador real senta na cadeira 1
-    -- Cria bots para 2, 3 e 4
-    for i = 2, 4 do
-        local seatName = "Cadeira"..i
-        local displayName = botNames[i] or ("Bot " .. i)
+    -- Itera APENAS sobre as cadeiras definidas na configuração
+    for _, seatIndex in ipairs(self.BotSeats) do
+        local seatName = "Cadeira" .. seatIndex
+        local displayName = botNamesMap[seatIndex] or ("Bot " .. seatIndex)
         
-        -- 1. Cria o Cérebro (Lógica) com o nome bonito
+        -- Se por acaso a configuração colocou humano e bot na 3, mudamos o nome
+        -- Ex: Se for 3 humanos, o Bot na 4 não é exatamente "Rival 2", mas serve.
+        
+        -- 1. Cria o Cérebro
         local fakeBot = Bot.new(displayName, seatName, self)
         self.Seats[seatName] = fakeBot
         
-        -- 2. Cria o Corpo (Visual) passando o nome
+        -- 2. Cria o Corpo
         self:SpawnVisualBot(seatName, displayName)
         
         print(displayName .. " adicionado na " .. seatName)
@@ -174,20 +178,25 @@ function Match:HandleOccupantChange(seat, seatName)
     if humanoid then
         local player = game.Players:GetPlayerFromCharacter(humanoid.Parent)
         if player then
-            -- Se for mesa de bot e não for a Cadeira 1, expulsa (apenas cadeira 1 é humana)
-            if self.UseBots and seatName ~= "Cadeira1" then
+            -- Verifica qual é o número desta cadeira
+            local seatNum = tonumber(seatName:match("%d+"))
+            
+            -- LÓGICA NOVA: Verifica se esta cadeira está na lista de Bots
+            if self.UseBots and table.find(self.BotSeats, seatNum) then
+                -- Se esta cadeira pertence a um bot, expulsa o humano
                 humanoid.Jump = true
                 return
             end
             
+            -- Se chegou aqui, o humano pode sentar!
             self.Seats[seatName] = player
             if self.OnPlayerJoin then self.OnPlayerJoin(player) end
             
-            -- Atualiza UI - AGORA DEVE FUNCIONAR O TEXTO
+            -- Atualiza UI
             self:NetworkFire(player, "SHOW_SCOREBOARD")
             self:NetworkFire(player, "UPDATE_SCORE", self.Scores)
             self:NetworkFire(player, "WAITING", 0) 
-            print("Jogador detectado e notificado: " .. player.Name)
+            print("Jogador detectado: " .. player.Name)
         end
     else
         -- Jogador saiu
