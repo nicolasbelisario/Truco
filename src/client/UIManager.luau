@@ -489,7 +489,10 @@ function UIManager.AddCardToHand(val, suit)
     btn.Activated:Connect(function()
         if not isMyTurn then return end
 
-		if isTrucoPending then return end
+        if isTrucoPending then 
+            UIManager.UpdateStatus("Resolva o Truco primeiro!", 0) -- Feedback visual opcional
+            return 
+        end
         
         if currentTrickNumber >= 2 then 
             wrapper.ZIndex = 20 
@@ -757,7 +760,7 @@ function UIManager.ShowRoundWinner(teamName)
     winnerLabel.TextStrokeTransparency = 0
     winnerLabel.Font = Enum.Font.GothamBlack
     winnerLabel.TextScaled = true
-    winnerLabel.Text = teamName .. " GANHOU A MÃO!"
+    winnerLabel.Text = teamName
     winnerLabel.Parent = screenGui
 
     task.delay(3, function()

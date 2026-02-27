@@ -27,6 +27,8 @@ end
 function Bot:MyTurn(trickNumber, vira, tableCards, handValue, trucoValue)
     -- Simula "pensar"
     task.delay(math.random(1.5, 3), function()
+        if not self.Match or self.Match.State ~= "PLAYING" then return end
+        if #self.Hand == 0 then return end
         if not self.Match or #self.Hand == 0 then return end
         
         -- 1. Chance de pedir Truco aleatoriamente (se a mão for boa ou blefe)

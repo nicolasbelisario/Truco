@@ -11,6 +11,7 @@ local currentPartner = "Ninguém"
 local myTeam = "A"
 local lastEmoteTime = 0
 local EMOTE_COOLDOWN = 3
+local isTrucoPending = false
 
 UIManager.Init()
 
@@ -67,53 +68,70 @@ end)
 
 Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
     
-    -- 1. MONITORAMENTO DE ESTADO (Para liberar/bloquear cliques)
-    -- Se o Truco foi aceito ou a rodada acabou, libera o jogo
-    if message == "TRUCO_ACEITO" or message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
-        isTrucoPending = false 
-    end
+    -- --- BLOCO DE TRUCO E INTERAÇÃO ---
 
-    -- 2. LÓGICA DE UI
     if message == "TRUCO_CALLED" then
-        -- Lógica Nova: Bloqueia e avisa
+        -- BLOQUEIA
         isTrucoPending = true 
         UIManager.HideTrucoChallenge() 
         UIManager.UpdateStatus("TRUCO! Vale " .. data, 0)
         UIManager.PlaySound("Truco")
-        
+
+    elseif message == "TRUCO_TIMEOUT" then
+        -- DESBLOQUEIA E AVISA
+        isTrucoPending = false
+        UIManager.HideTrucoChallenge()
+        UIManager.UpdateStatus("Tempo esgotado!", 0)
+
+    elseif message == "TRUCO_ACEITO" then
+        -- DESBLOQUEIA E ATUALIZA UI
+        isTrucoPending = false
+        UIManager.HideTrucoChallenge()
+        UIManager.ResetCamera()
+        UIManager.UpdateStatus("TRUCO ACEITO! Vale " .. data, 0)
+
     elseif message == "PARTNER_VOTED" then
         UIManager.UpdateChallengeStatus("Parceiro quer: " .. string.upper(data))
     
     elseif message == "WAITING_PARTNER" then
         UIManager.UpdateChallengeStatus("Aguardando seu parceiro...")
         
-    elseif message == "TRUCO_TIMEOUT" then
-        UIManager.HideTrucoChallenge()
-
     elseif message == "HIDE_TRUCO_BTN" then
         UIManager.SetCanTruco(false)
         UIManager.HideTrucoChallenge()
         
     elseif message == "SHOW_TRUCO_BTN" then
         UIManager.SetCanTruco(true)
-        
+
+    -- --- BLOCO DE RODADA E VITÓRIA ---
+
     elseif message == "DEALING" then
         UIManager.HideCutMenu()
         UIManager.PlaySound("Shuffle")
 
-    elseif message == "TRUCO_ACEITO" then
-        UIManager.HideTrucoChallenge()
-        UIManager.ResetCamera()
-        UIManager.UpdateStatus("TRUCO ACEITO! Vale " .. data, 0)
-
     elseif message == "TEAM_A_WON_HAND" or message == "TEAM_B_WON_HAND" then
+        -- DESBLOQUEIA O JOGO
+        isTrucoPending = false 
+        
         UIManager.HideTrucoChallenge()
         UIManager.ResetCamera()
-        local teamResult = (message == "TEAM_A_WON_HAND") and "DUPLA A" or "DUPLA B"
-        UIManager.ShowRoundWinner(teamResult)
+        
+        local winnerText = ""
+        
+        -- LÓGICA DE NOMES DOS JOGADORES
+        if type(data) == "table" and data.Names then
+            winnerText = data.Names .. " ganharam a mão!"
+        else
+            -- Fallback para garantir que não quebre
+            local teamResult = (message == "TEAM_A_WON_HAND") and "DUPLA A" or "DUPLA B"
+            winnerText = teamResult
+        end
+        
+        UIManager.ShowRoundWinner(winnerText)
+
+    -- --- ATUALIZAÇÕES DE STATUS E UI GERAL ---
 
     elseif message == "CLEAR_TABLE" then
-        -- Stats da rodada
         local myTricks = (myTeam == "A") and data.TeamA or data.TeamB
         local enemyTricks = (myTeam == "A") and data.TeamB or data.TeamA
         UIManager.UpdateRoundStats(currentPartner, myTricks, enemyTricks)
@@ -128,8 +146,6 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         
     elseif message == "UPDATE_ROUND_VALUE" then
         UIManager.UpdateRoundValue(data)
-
-    -- OBS: Removi o "TRUCO_CALLED" que estava duplicado aqui embaixo
 
     elseif message == "SHOW_SCOREBOARD" then
         UIManager.ShowScoreboard()
@@ -148,7 +164,6 @@ Events.GameStatusEvent.OnClientEvent:Connect(function(message, data)
         UIManager.PlaySound("Victory")
         
     elseif message == "CUTTING" then
-        -- Adicionando para garantir que o cliente saiba
         UIManager.UpdateStatus("Aguardando corte...", 0)
         
     else
