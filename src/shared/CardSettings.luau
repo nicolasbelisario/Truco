@@ -1,8 +1,10 @@
-local CardSettings = {
+local ConfiguracoesCartas = {
     Suits = {"Ouros", "Espadas", "Copas", "Paus"},
-    -- Sequência de força para o Truco Paulista (do mais fraco para o mais forte, sem contar manilhas)
+    
+    -- Sequência de força para o Truco Paulista (Sem contar as manilhas)
     Values = {"4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"},
-    ManilhaFixa = false, -- Paulista usa manilha variável (Vira)
+    ManilhaFixa = false, -- Paulista usa manilha variável dependente do "Vira"
+    -- Dicionário de texturas do Roblox.
 
 	Images = {
         ["A_Ouros"] = "rbxassetid://72779219971553",
@@ -49,4 +51,4 @@ local CardSettings = {
 	}
 }
 
-return CardSettings
+return ConfiguracoesCartas

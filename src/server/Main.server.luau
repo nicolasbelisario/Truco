@@ -1,8 +1,7 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TableManager = require(script.Parent:WaitForChild("TableManager"))
+local GerenciadorMesas = require(script.Parent:WaitForChild("TableManager"))
 
--- Inicializa o sistema de mesas procurando na pasta definida
-local mesasFolder = workspace:WaitForChild("MesasFolder") -- Crie essa pasta no Workspace!
-TableManager.Init(mesasFolder)
+-- Inicializa o sistema buscando a pasta "MesasFolder" no Workspace
+local pastaMesas = workspace:WaitForChild("MesasFolder") 
+GerenciadorMesas.Inicializar(pastaMesas)
 
 print("Servidor de Truco Iniciado com Sucesso!")

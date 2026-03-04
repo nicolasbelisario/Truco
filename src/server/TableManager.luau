@@ -1,72 +1,64 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Events = ReplicatedStorage:WaitForChild("Events")
-local Match = require(script.Parent.Classes:WaitForChild("Match"))
+local Eventos = ReplicatedStorage:WaitForChild("Events")
+local Partida = require(script.Parent.Classes:WaitForChild("Match"))
 
-local TableManager = {}
-local matches = {} -- [Model] = MatchInstance
-local playerToMatch = {} -- [Player] = MatchInstance
+local GerenciadorMesas = {}
+local listaMesas = {} -- Associa o Modelo 3D à Classe Partida
+local jogadorParaMesa = {} -- Associa o Jogador à Partida que ele está jogando
 
--- CONFIGURAÇÃO DOS BOTS POR NOME DA MESA
--- Define quais cadeiras serão ocupadas por BOTS.
--- As cadeiras que não estiverem na lista ficam livres para humanos.
-local BOT_CONFIGS = {
-    ["MesaPvE_Solo"] = {2, 3, 4}, -- 1 Humano vs 3 Bots (Padrão)
-    ["MesaPvE_Dupla"] = {2, 4},   -- 2 Humanos (1 e 3) vs 2 Bots (2 e 4)
-    ["MesaPvE_Trio"] = {4},       -- 3 Humanos (1, 2, 3) vs 1 Bot (4)
+-- CONFIGURAÇÃO DOS BOTS POR NOME DA MESA (PvE)
+local CONFIG_BOTS = {
+    ["MesaPvE_Solo"] = {2, 3, 4}, -- 1 Humano vs 3 Bots
+    ["MesaPvE_Dupla"] = {2, 4},   -- 2 Humanos vs 2 Bots
+    ["MesaPvE_Trio"] = {4},       -- 3 Humanos vs 1 Bot
 }
 
-function TableManager.Init(folder)
-    for _, mesaModel in ipairs(folder:GetChildren()) do
+-- [MÉTODO] Lê todas as mesas do mapa e cria as instâncias lógicas
+function GerenciadorMesas.Inicializar(pasta)
+    for _, modeloMesa in ipairs(pasta:GetChildren()) do
         
-        -- Verifica se o nome da mesa existe na nossa configuração
-        local botSeats = BOT_CONFIGS[mesaModel.Name]
+        local cadeirasBot = CONFIG_BOTS[modeloMesa.Name] or {}
+        local partida = Partida.nova(modeloMesa, cadeirasBot)
         
-        -- Se botSeats não for nil, é uma mesa PvE. Se for nil, é PvP normal (lista vazia).
-        local configToPass = botSeats or {}
+        listaMesas[modeloMesa] = partida
         
-        -- Cria a partida passando a lista de cadeiras de bot
-        local match = Match.new(mesaModel, configToPass)
-        matches[mesaModel] = match
-        
-        match.OnPlayerJoin = function(player)
-            playerToMatch[player] = match
+        -- Callbacks para registrar qual jogador está em qual mesa
+        partida.OnPlayerJoin = function(jogador)
+            jogadorParaMesa[jogador] = partida
         end
         
-        match.OnPlayerLeave = function(player)
-            playerToMatch[player] = nil
+        partida.OnPlayerLeave = function(jogador)
+            jogadorParaMesa[jogador] = nil
         end
     end
     
-    TableManager.SetupNetwork()
+    GerenciadorMesas.ConfigurarRede()
 end
 
--- Roteamento de Eventos: O cliente manda o evento, o TableManager descobre de qual mesa ele é
-function TableManager.SetupNetwork()
-    -- Jogar Carta
-    Events.PlayCardEvent.OnServerEvent:Connect(function(player, val, suit, hidden)
-        local match = playerToMatch[player]
-        if match then match:PlayerPlayCard(player, val, suit, hidden) end
+-- [MÉTODO] Recebe as ações dos clientes e redireciona para a mesa correta
+function GerenciadorMesas.ConfigurarRede()
+    
+    Eventos.PlayCardEvent.OnServerEvent:Connect(function(jogador, valor, naipe, escondida)
+        local partida = jogadorParaMesa[jogador]
+        if partida then partida:JogadorJogarCarta(jogador, valor, naipe, escondida) end
     end)
 
-    -- Ações de Truco (Pedir, Aceitar, Correr)
-    Events.TrucoEvent.OnServerEvent:Connect(function(player, action, subAction)
-        local match = playerToMatch[player]
-        if match then match:HandleTrucoAction(player, action, subAction) end
+    Eventos.TrucoEvent.OnServerEvent:Connect(function(jogador, acao, subAcao)
+        local partida = jogadorParaMesa[jogador]
+        if partida then partida:ProcessarAcaoTruco(jogador, acao, subAcao) end
     end)
     
-    -- Ação de Corte
-    Events.GameStatusEvent.OnServerEvent:Connect(function(player, action, value)
-        local match = playerToMatch[player]
-        if match and action == "CutAction" then
-            match:PlayerCutDeck(player, value)
+    Eventos.GameStatusEvent.OnServerEvent:Connect(function(jogador, acao, valor)
+        local partida = jogadorParaMesa[jogador]
+        if partida and acao == "CutAction" then
+            partida:JogadorCortarBaralho(jogador, valor)
         end
     end)
     
-    -- Sinais (Emotes)
-    Events.SignalEvent.OnServerEvent:Connect(function(player, signalType)
-        local match = playerToMatch[player]
-        if match then match:BroadcastSignal(player, signalType) end
+    Eventos.SignalEvent.OnServerEvent:Connect(function(jogador, tipoSinal)
+        local partida = jogadorParaMesa[jogador]
+        if partida then partida:TransmitirSinal(jogador, tipoSinal) end
     end)
 end
 
-return TableManager
+return GerenciadorMesas
