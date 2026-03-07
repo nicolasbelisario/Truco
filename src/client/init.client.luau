@@ -265,3 +265,44 @@ end
 
 objetoMusica.Ended:Connect(tocarProximaMusica)
 task.spawn(tocarProximaMusica)
+
+-- ==========================================
+-- SISTEMA DE ZONA DO TUTORIAL
+-- ==========================================
+local RunService = game:GetService("RunService")
+local zonaTutorial = workspace.Tutorial:WaitForChild("ZonaTutorial", 10) -- Espera carregar o círculo verde
+local RAIO_ZONA = 8 -- Tamanho do raio em studs (ajuste conforme o tamanho do seu círculo)
+
+local jogadorNaZona = false
+
+if zonaTutorial then
+    -- Roda uma verificação a cada 0.5 segundos (muito leve para o PC)
+    task.spawn(function()
+        while task.wait(0.5) do
+            local personagem = jogadorLocal.Character
+            if personagem and personagem:FindFirstChild("HumanoidRootPart") then
+                local hrp = personagem.HumanoidRootPart
+                
+                -- Ignora o eixo Y (altura) para que um pulo não feche o menu
+                local posJogador = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
+                local posZona = Vector3.new(zonaTutorial.Position.X, 0, zonaTutorial.Position.Z)
+                
+                local distancia = (posJogador - posZona).Magnitude
+                
+                if distancia <= RAIO_ZONA then
+                    if not jogadorNaZona then
+                        jogadorNaZona = true
+                        GerenciadorUI.MostrarTutorial(true)
+                    end
+                else
+                    if jogadorNaZona then
+                        jogadorNaZona = false
+                        GerenciadorUI.MostrarTutorial(false)
+                    end
+                end
+            end
+        end
+    end)
+else
+    warn("Não foi possível encontrar a 'ZonaTutorial' no Workspace.")
+end

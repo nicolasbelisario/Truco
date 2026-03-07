@@ -26,6 +26,10 @@ local centroMesa, btnTruco, textoEstatisticas, painelEstatisticas, painelDesafio
 local barraTempoDesafio, painelOpcoesJogada, painelEmotes
 local btnLoja, menuLoja, paginaPontos, paginaRobux
 local btnAbaPontos, btnAbaRobux
+-- Variáveis do Tutorial
+local menuTutorial, imgTutorial, textoTutorial, tituloTutorial, btnAnteriorTut, btnProximoTut
+local slideAtualTutorial = 1
+local naZonaTutorial = false -- Impede que o menu fique reabrindo sozinho
 
 local estaSentado = false
 local eMinhaVez = false
@@ -223,11 +227,175 @@ function GerenciadorUI.Inicializar()
     GerenciadorUI.CriarMenuCorte()
     GerenciadorUI.CriarInterfaceDesafio()
     GerenciadorUI.CriarBotoesEmote()
+    GerenciadorUI.CriarMenuTutorial()
 end
 
 -- ==========================================
 -- SUB-CRIAÇÕES DE UI
 -- ==========================================
+
+-- ================= TUTORIAL =================
+local SLIDES_TUTORIAL = {
+    { Titulo = "O OBJETIVO", Texto = "Bem-vindo ao Truco! O jogo é disputado em duplas (2 contra 2). O objetivo da sua equipe é alcançar 12 pontos antes dos adversários.", Imagem = "rbxassetid:// 94577408525560" },
+    { Titulo = "A RODADA", Texto = "Cada rodada (Mão) vale 1 ponto. Para ganhar, sua dupla precisa vencer 2 de 3 quedas. Cada jogador joga uma carta por queda, a mais forte vence.", Imagem = "rbxassetid://117539543208859" },
+    { Titulo = "A FORÇA", Texto = "A força das cartas normais, da mais fraca para a mais forte, é: 4, 5, 6, 7, Q, J, K, A, 2, 3. Naipe não importa aqui, apenas o número!", Imagem = "rbxassetid://73972302411191" },
+    { Titulo = "AS MANILHAS", Texto = "No início, uma carta é virada (O Vira). A Manilha é a carta logo acima dele. Ex: Se o Vira for 5, todos os 6 viram Manilhas, as mais fortes do jogo!", Imagem = "rbxassetid://109233300765686" },
+    { Titulo = "TRUCO!", Texto = "Acha que tem cartas boas? Clique em TRUCO! Isso aumenta o valor da Mão para 3 pontos. Os adversários podem Aceitar, Fugir ou Aumentar para 6!", Imagem = "rbxassetid://86983343730484" },
+    { Titulo = "DICAS", Texto = "Jogue cartas Cobertas para esconder seu jogo e use os Sinais (Olhar/Mão) para se comunicar com seu parceiro. Boa sorte!", Imagem = "rbxassetid://75845041324394" }
+}
+
+-- [MÉTODO INTERNO] Atualiza os textos e botões baseado no slide atual
+local function atualizarSlideTutorial()
+    local dados = SLIDES_TUTORIAL[slideAtualTutorial]
+    tituloTutorial.Text = dados.Titulo
+    textoTutorial.Text = dados.Texto
+    
+    -- Atualiza a imagem se houver ID. Caso contrário, fica o fundo cinza.
+    if dados.Imagem ~= "" then
+        imgTutorial.Image = dados.Imagem
+        imgTutorial.BackgroundTransparency = 1
+    else
+        imgTutorial.Image = ""
+        imgTutorial.BackgroundTransparency = 0
+    end
+
+    -- Esconde o botão "Anterior" se estiver na primeira página
+    btnAnteriorTut.Visible = (slideAtualTutorial > 1)
+    
+    -- Muda o botão "Próximo" para "Entendi" na última página
+    if slideAtualTutorial == #SLIDES_TUTORIAL then
+        btnProximoTut.Text = "ENTENDI!"
+        btnProximoTut.BackgroundColor3 = Color3.fromRGB(0, 150, 255) -- Azul para o botão final
+    else
+        btnProximoTut.Text = "PRÓXIMO >"
+        btnProximoTut.BackgroundColor3 = Color3.fromRGB(0, 196, 39) -- Verde
+    end
+end
+
+function GerenciadorUI.CriarMenuTutorial()
+    menuTutorial = Instance.new("Frame")
+    menuTutorial.Name = "MenuTutorial"
+    menuTutorial.Size = UDim2.new(0, 500, 0, 450)
+    menuTutorial.Position = UDim2.new(0.5, 0, 0.5, 0)
+    menuTutorial.AnchorPoint = Vector2.new(0.5, 0.5)
+    menuTutorial.BackgroundColor3 = Color3.fromRGB(175, 175, 175) 
+    menuTutorial.Visible = false
+    menuTutorial.ZIndex = 60
+    menuTutorial.Parent = painelTela
+    Instance.new("UICorner", menuTutorial).CornerRadius = UDim.new(0, 20)
+
+    -- Botão Fechar (X)
+    local btnFechar = Instance.new("TextButton")
+    btnFechar.Size = UDim2.new(0, 40, 0, 40)
+    btnFechar.Position = UDim2.new(1, -15, 0, 15)
+    btnFechar.AnchorPoint = Vector2.new(1, 0)
+    btnFechar.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btnFechar.Text = "X"
+    btnFechar.TextColor3 = Color3.new(1, 1, 1)
+    btnFechar.Font = Enum.Font.GothamBlack
+    btnFechar.TextSize = 20
+    btnFechar.ZIndex = 62
+    btnFechar.Parent = menuTutorial
+    Instance.new("UICorner", btnFechar).CornerRadius = UDim.new(1, 0)
+    
+    btnFechar.Activated:Connect(function()
+        GerenciadorUI.MostrarTutorial(false)
+    end)
+
+    tituloTutorial = Instance.new("TextLabel")
+    tituloTutorial.Size = UDim2.new(1, 0, 0, 50)
+    tituloTutorial.Position = UDim2.new(0, 0, 0, 10)
+    tituloTutorial.BackgroundTransparency = 1
+    tituloTutorial.Text = "TUTORIAL"
+    tituloTutorial.TextColor3 = Color3.new(1, 1, 1)
+    tituloTutorial.Font = Enum.Font.GothamBlack
+    tituloTutorial.TextSize = 35
+    tituloTutorial.ZIndex = 61
+    tituloTutorial.Parent = menuTutorial
+
+    -- Imagem demonstrativa (Placeholder cinza escuro)
+    imgTutorial = Instance.new("ImageLabel")
+    imgTutorial.Size = UDim2.new(0.8, 0, 0.4, 0)
+    imgTutorial.Position = UDim2.new(0.5, 0, 0.15, 0)
+    imgTutorial.AnchorPoint = Vector2.new(0.5, 0)
+    imgTutorial.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    imgTutorial.ZIndex = 61
+    imgTutorial.Parent = menuTutorial
+    Instance.new("UICorner", imgTutorial).CornerRadius = UDim.new(0, 10)
+
+    -- Texto Explicativo
+    textoTutorial = Instance.new("TextLabel")
+    textoTutorial.Size = UDim2.new(0.9, 0, 0.3, 0)
+    textoTutorial.Position = UDim2.new(0.5, 0, 0.6, 0)
+    textoTutorial.AnchorPoint = Vector2.new(0.5, 0)
+    textoTutorial.BackgroundTransparency = 1
+    textoTutorial.Text = ""
+    textoTutorial.TextColor3 = Color3.new(1, 1, 1)
+    textoTutorial.Font = Enum.Font.GothamMedium
+    textoTutorial.TextSize = 18
+    textoTutorial.TextWrapped = true
+    textoTutorial.ZIndex = 61
+    textoTutorial.Parent = menuTutorial
+
+    -- Botões de Navegação
+    btnAnteriorTut = Instance.new("TextButton")
+    btnAnteriorTut.Size = UDim2.new(0, 150, 0, 45)
+    btnAnteriorTut.Position = UDim2.new(0.25, 0, 0.95, 0)
+    btnAnteriorTut.AnchorPoint = Vector2.new(0.5, 1)
+    btnAnteriorTut.BackgroundColor3 = Color3.fromRGB(200, 105, 50) 
+    btnAnteriorTut.Text = "< ANTERIOR"
+    btnAnteriorTut.TextColor3 = Color3.new(1, 1, 1)
+    btnAnteriorTut.Font = Enum.Font.GothamBlack
+    btnAnteriorTut.TextSize = 18
+    btnAnteriorTut.ZIndex = 62
+    btnAnteriorTut.Parent = menuTutorial
+    Instance.new("UICorner", btnAnteriorTut).CornerRadius = UDim.new(0.5, 0)
+
+    btnProximoTut = Instance.new("TextButton")
+    btnProximoTut.Size = UDim2.new(0, 150, 0, 45)
+    btnProximoTut.Position = UDim2.new(0.75, 0, 0.95, 0)
+    btnProximoTut.AnchorPoint = Vector2.new(0.5, 1)
+    btnProximoTut.BackgroundColor3 = Color3.fromRGB(0, 196, 39) 
+    btnProximoTut.Text = "PRÓXIMO >"
+    btnProximoTut.TextColor3 = Color3.new(1, 1, 1)
+    btnProximoTut.Font = Enum.Font.GothamBlack
+    btnProximoTut.TextSize = 18
+    btnProximoTut.ZIndex = 62
+    btnProximoTut.Parent = menuTutorial
+    Instance.new("UICorner", btnProximoTut).CornerRadius = UDim.new(0.5, 0)
+
+    -- Ações dos Botões
+    btnAnteriorTut.Activated:Connect(function()
+        if slideAtualTutorial > 1 then
+            slideAtualTutorial -= 1
+            atualizarSlideTutorial()
+        end
+    end)
+
+    btnProximoTut.Activated:Connect(function()
+        if slideAtualTutorial < #SLIDES_TUTORIAL then
+            slideAtualTutorial += 1
+            atualizarSlideTutorial()
+        else
+            GerenciadorUI.MostrarTutorial(false) -- Clicou em "ENTENDI"
+        end
+    end)
+end
+
+-- [MÉTODO] Abre e fecha o tutorial e carrega o primeiro slide de forma limpa
+function GerenciadorUI.MostrarTutorial(abrir)
+    if not menuTutorial then return end
+    
+    if abrir then
+        slideAtualTutorial = 1 
+        atualizarSlideTutorial() -- AGORA SIM: Preenche tudo antes de mostrar!
+        menuTutorial.Visible = true
+    else
+        menuTutorial.Visible = false
+    end
+end
+
+-- E NÃO ESQUEÇA: Coloque `GerenciadorUI.CriarMenuTutorial()` dentro da sua função `GerenciadorUI.Inicializar()`!
 
 -- [MÉTODO] Cria a interface completa da Loja
 function GerenciadorUI.CriarMenuLoja()
