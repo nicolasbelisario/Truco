@@ -6,6 +6,7 @@ local GerenciadorBaralho = require(script.Parent.Parent.Utils:WaitForChild("Deck
 local GerenciadorRegras = require(script.Parent.Parent.Utils:WaitForChild("RuleManager"))
 local Bot = require(script.Parent:WaitForChild("Bot"))
 local BotDummyTemplate = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BotDummy")
+local DataManager = require(script.Parent.Parent:WaitForChild("DataManager"))
 
 local Partida = {}
 Partida.__index = Partida
@@ -321,6 +322,28 @@ function Partida:VencerMao(equipeVencedora)
         local nomesCampeoes = self:ObterNomesEquipe(equipeCampeao)
         
         self:TransmitirTodos("MATCH_WON", nomesCampeoes .. " Venceram!")
+        
+        -- ========================================================
+        -- DISTRIBUIÇÃO DE PONTOS (SISTEMA NOVO)
+        -- ========================================================
+        local pontosVitoria = self.UsaBots and 30 or 50
+        local pontosDerrota = self.UsaBots and 10 or 20
+
+        for nomeAssento, jog in pairs(self.Assentos) do
+            if not self:EBot(jog) then
+                local equipeDesteJogador = self:ObterEquipe(jog)
+                
+                if equipeDesteJogador == equipeCampeao then
+                    DataManager.AdicionarPontos(jog, pontosVitoria)
+                    self:EnviarParaJogador(jog, "UPDATE_STATUS", "Você ganhou +" .. pontosVitoria .. " Pontos!")
+                else
+                    DataManager.AdicionarPontos(jog, pontosDerrota)
+                    self:EnviarParaJogador(jog, "UPDATE_STATUS", "Você ganhou +" .. pontosDerrota .. " Pontos de consolação.")
+                end
+            end
+        end
+        -- ========================================================
+        
         task.wait(8)
         self:ResetarPartida("Nova Partida")
     else

@@ -315,10 +315,11 @@ function GerenciadorUI.CriarMenuTutorial()
 
     -- Imagem demonstrativa (Placeholder cinza escuro)
     imgTutorial = Instance.new("ImageLabel")
-    imgTutorial.Size = UDim2.new(0.8, 0, 0.4, 0)
+    imgTutorial.Size = UDim2.new(0.85, 0, 0.4, 0)
     imgTutorial.Position = UDim2.new(0.5, 0, 0.15, 0)
     imgTutorial.AnchorPoint = Vector2.new(0.5, 0)
     imgTutorial.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    imgTutorial.ScaleType = Enum.ScaleType.Fit
     imgTutorial.ZIndex = 61
     imgTutorial.Parent = menuTutorial
     Instance.new("UICorner", imgTutorial).CornerRadius = UDim.new(0, 10)
@@ -885,8 +886,7 @@ function GerenciadorUI.AdicionarCartaMao(valor, naipe)
     btnImg.Size = UDim2.new(1, 0, 1, 0) -- Pega 100% da caixa
     btnImg.BackgroundTransparency = 1 -- Fundo invisivel
     
-    local chave = valor .. "_" .. naipe
-    btnImg.Image = CardSettings.Images[chave] or "" -- Carrega a imagem do Roblox
+    CardSettings.AplicarSkinCarta(btnImg, valor, naipe, false, "Padrao")
     btnImg.Parent = conteinerCarta
     
     local curva = Instance.new("UICorner")
@@ -1005,12 +1005,7 @@ function GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, escondi
     cartaImg.Size = UDim2.new(0, 110, 0, 160) -- Tamanho fixo da imagem
     cartaImg.BackgroundTransparency = 1 -- Invisível
     
-    if escondida then
-        cartaImg.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
-    else
-        local chave = valor .. "_" .. naipe
-        cartaImg.Image = CardSettings.Images[chave] or ""
-    end
+    CardSettings.AplicarSkinCarta(cartaImg, valor, naipe, escondida, "Padrao")
     
     local etiquetaNome = Instance.new("TextLabel")
     etiquetaNome.Text = nomeJogador -- De quem é a carta
@@ -1158,10 +1153,7 @@ function GerenciadorUI.DefinirVira(val, naipe)
     imgVira.BackgroundTransparency = 1 -- Sem fundo
     imgVira.Parent = painelVira
     
-    local chave = val .. "_" .. naipe
-    if CardSettings.Images[chave] then
-        imgVira.Image = CardSettings.Images[chave]
-    end
+    CardSettings.AplicarSkinCarta(imgVira, val, naipe, false, "Padrao")
 
     local textoCarta = Instance.new("TextLabel")
     textoCarta.Text = val .. " " .. naipe -- Texto em baixo da imagem

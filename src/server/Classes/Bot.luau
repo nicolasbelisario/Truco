@@ -35,7 +35,7 @@ function Bot:JogarTurno(numeroQueda, vira, cartasNaMesa, valorMao, valorTruco)
         
         -- 1. Chance de pedir Truco (Blefe ou mão boa)
         -- Regra atual: 10% de chance de pedir truco se a mão ainda vale 1
-        if valorMao == 1 and math.random() < 1 then
+        if valorMao == 1 and math.random() < 0.1 then
             self.Partida:ProcessarAcaoTruco(self, "Request")
             return
         end

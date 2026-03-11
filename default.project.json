@@ -13,7 +13,8 @@
         "UpdateTurnEvent": { "$className": "RemoteEvent" },
         "CardPlayedOnTable": { "$className": "RemoteEvent" },
         "TrucoEvent": { "$className": "RemoteEvent" },
-        "SignalEvent": { "$className": "RemoteEvent" }
+        "SignalEvent": { "$className": "RemoteEvent" },
+        "SyncDataEvent": { "$className": "RemoteEvent" }
       },
       "Shared": {
         "$path": "src/shared"

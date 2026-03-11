@@ -98,18 +98,15 @@ function VisuaisMesa.GerarCarta(jogadorOuNome, valor, naipe, estaEscondida)
     imgCima.ScaleType = Enum.ScaleType.Fit
     imgCima.Parent = guiCima
     
-    if estaEscondida then
-        imgCima.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
-    else
-        local chave = valor .. "_" .. naipe
-        imgCima.Image = CardSettings.Images[chave] or ""
-    end
+    -- Aplica na parte de Cima (Aberta ou Escondida baseada na jogada)
+    CardSettings.AplicarSkinCarta(imgCima, valor, naipe, estaEscondida, "Padrao")
     
-    -- Face Baixo
     local guiBaixo = guiCima:Clone()
     guiBaixo.Face = Enum.NormalId.Bottom
     guiBaixo.Parent = pecaCarta
-    guiBaixo.ImageLabel.Image = CardSettings.Images["CardBack"] or "rbxassetid://0"
+    
+    -- A parte de Baixo (costas da carta) é sempre escondida=true
+    CardSettings.AplicarSkinCarta(guiBaixo.ImageLabel, valor, naipe, true, "Padrao")
 
     -- 3. Ponto de Partida (Do peito ou de cima da mesa)
     local posInicial = tampoMesa.Position + Vector3.new(0, 4, 0)
