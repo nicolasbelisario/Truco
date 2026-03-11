@@ -255,11 +255,19 @@ function Partida:JogadorJogarCarta(jogador, valor, naipe, escondida)
     local numRodada = self.QuedasGanhas.TeamA + self.QuedasGanhas.TeamB + 1
     if numRodada == 1 then escondida = false end 
     
-    table.insert(self.CartasNaMesa, { Player = jogador, Value = valor, Suit = naipe, IsHidden = escondida })
+    -- ======== LÊ A SKIN DO JOGADOR ========
+    local skinUsada = "Padrao"
+    if not self:EBot(jogador) then
+        skinUsada = DataManager.ObterSkinEquipada(jogador)
+    end
+    -- ======================================
+
+    table.insert(self.CartasNaMesa, { Player = jogador, Value = valor, Suit = naipe, IsHidden = escondida, Skin = skinUsada })
     
     local nomeExibicao = self:EBot(jogador) and jogador.Nome or jogador.Name 
     for _, humano in ipairs(self:ObterHumanos()) do
-        Eventos.CardPlayedOnTable:FireClient(humano, nomeExibicao, valor, naipe, escondida)
+        -- Agora enviamos a "skinUsada" no final do evento!
+        Eventos.CardPlayedOnTable:FireClient(humano, nomeExibicao, valor, naipe, escondida, skinUsada)
     end
     
     if #self.CartasNaMesa >= 4 then

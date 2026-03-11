@@ -14,34 +14,50 @@ local CardSettings = {
         ["J"] = 5, ["K"] = 6, ["A"] = 7, ["2"] = 8, ["3"] = 9 
     },
 
-    -- SEU SISTEMA DE SKINS
+    -- ========================================================
+    -- REGISTRO DE SKINS (COLE SEUS IDs AQUI!)
+    -- ========================================================
     Skins = {
         ["Padrao"] = {
-            SpriteSheetId = "rbxassetid://71265377205830", -- Coloque o ID da Spritesheet completa
+            SpriteSheetId = "rbxassetid://71265377205830", 
+            CardWidth = 93,
+            CardHeight = 133,
+        },
+        ["Rosa"] = {
+            SpriteSheetId = "rbxassetid://72215825993264",
+            CardWidth = 93, 
+            CardHeight = 133,
+        },
+        ["Nacional"] = {
+            SpriteSheetId = "rbxassetid://120203539916545",
+            CardWidth = 93, 
+            CardHeight = 133,
+        },
+        ["Estrela"] = {
+            SpriteSheetId = "rbxassetid://122080376953829",
             CardWidth = 93, 
             CardHeight = 133,
         }
-        -- Para criar um baralho novo no futuro, basta adicionar aqui:
-        -- ["BaralhoVampiro"] = { SpriteSheetId = "rbxassetid://OUTRO_ID", CardWidth = 350, CardHeight = 500 }
     }
 }
 
 -- [MÉTODO] Aplica o recorte inteligente da carta usando 1 única imagem
 function CardSettings.AplicarSkinCarta(elementoGUI, valor, naipe, escondida, nomeSkin)
+    -- Se por acaso pedir uma skin que não existe, cai na Padrao
     nomeSkin = nomeSkin or "Padrao"
-    local skin = CardSettings.Skins[nomeSkin]
+    local skin = CardSettings.Skins[nomeSkin] or CardSettings.Skins["Padrao"]
     
     if not skin then return end
 
-    -- Como é tudo na mesma imagem, aplicamos a Spritesheet direto
+    -- Aplica a imagem da Spritesheet
     elementoGUI.Image = skin.SpriteSheetId
     
     if escondida then
-        -- Se estiver escondida, busca a carta na última coluna (Índice 10) e primeira linha (Índice 0)
+        -- O Fundo da carta está na última coluna (Índice 10), Linha 0
         elementoGUI.ImageRectSize = Vector2.new(skin.CardWidth, skin.CardHeight)
         elementoGUI.ImageRectOffset = Vector2.new(10 * skin.CardWidth, 0)
     else
-        -- Se estiver aberta, busca a coordenada normal
+        -- Acha a coordenada exata da frente da carta
         local colunaX = CardSettings.Column[valor] or 0
         local linhaY = CardSettings.Row[naipe] or 0
         

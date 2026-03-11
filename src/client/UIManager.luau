@@ -29,14 +29,25 @@ local btnAbaPontos, btnAbaRobux
 -- Variáveis do Tutorial
 local menuTutorial, imgTutorial, textoTutorial, tituloTutorial, btnAnteriorTut, btnProximoTut
 local slideAtualTutorial = 1
-local naZonaTutorial = false -- Impede que o menu fique reabrindo sozinho
+local dadosJogador = { Pontos = 0, SkinsCompradas = {"Padrao"}, SkinEquipada = "Padrao" }
+local textoMeusPontos -- Para mostrar quantos pontos o cara tem na loja
 
+local naZonaTutorial = false -- Impede que o menu fique reabrindo sozinho
 local estaSentado = false
 local eMinhaVez = false
 local possoPedirTruco = true
 local trucoPendente = false
 local numeroQuedaAtual = 1
 local callbackEmote = nil
+
+-- [MÉTODO] Atualiza as informações locais quando o servidor manda dados novos
+function GerenciadorUI.AtualizarDadosJogador(dados)
+    dadosJogador = dados
+    if textoMeusPontos then
+        textoMeusPontos.Text = "MEUS PONTOS: " .. tostring(dadosJogador.Pontos)
+    end
+    GerenciadorUI.RenderizarSkinsPontos() -- Recarrega a loja para atualizar os botões
+end
 
 -- [MÉTODO] Inicializa toda a interface do zero
 function GerenciadorUI.Inicializar()
@@ -228,6 +239,7 @@ function GerenciadorUI.Inicializar()
     GerenciadorUI.CriarInterfaceDesafio()
     GerenciadorUI.CriarBotoesEmote()
     GerenciadorUI.CriarMenuTutorial()
+    GerenciadorUI.CriarMenuAdmin()
 end
 
 -- ==========================================
@@ -470,24 +482,34 @@ function GerenciadorUI.CriarMenuLoja()
     btnAbaRobux.Parent = containerAbas
     Instance.new("UICorner", btnAbaRobux).CornerRadius = UDim.new(0.5, 0)
 
+    -- Texto exibindo o saldo de Pontos (Colocado no topo do menu)
+    textoMeusPontos = Instance.new("TextLabel")
+    textoMeusPontos.Size = UDim2.new(1, 0, 0, 30)
+    textoMeusPontos.Position = UDim2.new(0, 0, 0, -35)
+    textoMeusPontos.BackgroundTransparency = 1
+    textoMeusPontos.Text = "MEUS PONTOS: 0"
+    textoMeusPontos.TextColor3 = Color3.fromRGB(255, 215, 0) -- Dourado
+    textoMeusPontos.Font = Enum.Font.GothamBlack
+    textoMeusPontos.TextSize = 24
+    textoMeusPontos.ZIndex = 51
+    textoMeusPontos.Parent = menuLoja
+
     -- ================= PÁGINA: PONTOS =================
-    paginaPontos = Instance.new("Frame")
-    paginaPontos.Size = UDim2.new(1, 0, 1, -100)
-    paginaPontos.Position = UDim2.new(0, 0, 0, 100)
+    -- Agora é um ScrollingFrame, igual a aba de Robux!
+    paginaPontos = Instance.new("ScrollingFrame")
+    paginaPontos.Size = UDim2.new(1, -40, 1, -110)
+    paginaPontos.Position = UDim2.new(0, 20, 0, 90)
     paginaPontos.BackgroundTransparency = 1
-    paginaPontos.Visible = true -- Começa visível
+    paginaPontos.ScrollBarThickness = 6
+    paginaPontos.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 50)
+    paginaPontos.Visible = true 
+    paginaPontos.AutomaticCanvasSize = Enum.AutomaticSize.Y 
+    paginaPontos.CanvasSize = UDim2.new(0, 0, 0, 0)
     paginaPontos.Parent = menuLoja
 
-    local txtOps = Instance.new("TextLabel")
-    txtOps.Size = UDim2.new(0.8, 0, 0.2, 0)
-    txtOps.Position = UDim2.new(0.5, 0, 0.4, 0)
-    txtOps.AnchorPoint = Vector2.new(0.5, 0.5)
-    txtOps.BackgroundTransparency = 1
-    txtOps.Text = "OPS.... AINDA NÃO HÁ SISTEMAS DE PONTOS"
-    txtOps.TextColor3 = Color3.new(1, 1, 1)
-    txtOps.Font = Enum.Font.GothamMedium
-    txtOps.TextSize = 20
-    txtOps.Parent = paginaPontos
+    local layoutPontos = Instance.new("UIListLayout", paginaPontos)
+    layoutPontos.Padding = UDim.new(0, 15)
+    layoutPontos.SortOrder = Enum.SortOrder.LayoutOrder
 
     -- ================= PÁGINA: ROBUX =================
     paginaRobux = Instance.new("ScrollingFrame")
@@ -584,10 +606,18 @@ function GerenciadorUI.CriarMenuLoja()
         end)
     end
 
-    -- Cria os itens (Substitua os números 000000 pelos IDs reais depois)
+    -- Cria os itens (Substitua os números 000000 pelos IDs reais do seu jogo depois!)
     -- Os últimos dois parâmetros são: ID do produto e se é Gamepass (true ou false)
+    
+    -- ======== PACOTES DE PONTOS ========
+    criarItemLoja("100 Pontos", "Impulsione suas compras!", "10", 3554291316, false)
+    criarItemLoja("500 Pontos", "Fique rico rapidamente!", "40", 3554291580, false)
+    
+    -- ======== DOAÇÕES ========
     criarItemLoja("Doação 1", "Vai me ajudar a desenvolver o jogo :D", "15", 3549774213, false)
     criarItemLoja("Doação 2", "Vai me ajudar a desenvolver o jogo :D", "30", 3549774425, false)
+
+    -- ================= LÓGICA DAS ABAS =================
     
     -- Exemplo se fosse uma Gamepass (Sinalizado com "true" no final):
     -- criarItemLoja("Passe VIP", "Dá uma coroa no seu nick!", "100", 111222333, true)
@@ -606,6 +636,120 @@ function GerenciadorUI.CriarMenuLoja()
         btnAbaPontos.BackgroundColor3 = corLaranjaInativo
         btnAbaRobux.BackgroundColor3 = corVerdeAtivo
     end)
+end
+
+-- Catálogo de Skins disponíveis no jogo
+local CATALOGO_SKINS = {
+    { Id = "Padrao", Nome = "Baralho Clássico", Preco = 0, Desc = "O bom e velho Truco raiz." },
+    { Id = "Rosa", Nome = "Baralho Rosa", Preco = 200, Desc = "Para quem gosta de um jogo fofinho." },
+    { Id = "Nacional", Nome = "Baralho Nacional", Preco = 300, Desc = "Baralho 100% patriota." },
+    { Id = "Estrela", Nome = "Baralho Estelar", Preco = 300, Desc = "Baralho 100% da Estrela Vermelha." },
+}
+
+-- [MÉTODO] Desenha os itens na aba de pontos baseado no que o jogador já tem
+function GerenciadorUI.RenderizarSkinsPontos()
+    if not paginaPontos then return end
+    
+    -- Limpa a lista antiga para desenhar a nova atualizada
+    for _, filho in ipairs(paginaPontos:GetChildren()) do
+        if filho:IsA("Frame") then filho:Destroy() end
+    end
+
+    for _, skin in ipairs(CATALOGO_SKINS) do
+        local frameItem = Instance.new("Frame")
+        frameItem.Size = UDim2.new(1, -10, 0, 100)
+        frameItem.BackgroundTransparency = 1
+        frameItem.ZIndex = 51 
+        frameItem.Parent = paginaPontos
+
+        -- Placeholder da imagem da carta (Caixa cor sólida por enquanto)
+    -- Substitua o Frame do ícone antigo por este ImageLabel
+        local icone = Instance.new("ImageLabel")
+        icone.Size = UDim2.new(0, 60, 0, 85) -- Formato de carta
+        icone.Position = UDim2.new(0, 20, 0.5, 0)
+        icone.AnchorPoint = Vector2.new(0, 0.5)
+        icone.BackgroundTransparency = 1 -- Fundo invisível
+        icone.ZIndex = 51 
+        icone.Parent = frameItem
+        Instance.new("UICorner", icone).CornerRadius = UDim.new(0, 6)
+
+        -- ======== MÁGICA AQUI: Aplica o Ás de Espadas da respectiva skin! ========
+        CardSettings.AplicarSkinCarta(icone, "A", "Espadas", false, skin.Id)
+        -- =========================================================================
+
+        local titulo = Instance.new("TextLabel")
+        titulo.Size = UDim2.new(0.6, 0, 0.3, 0)
+        titulo.Position = UDim2.new(0, 100, 0, 10)
+        titulo.BackgroundTransparency = 1
+        titulo.Text = skin.Nome
+        titulo.TextColor3 = Color3.new(1, 1, 1)
+        titulo.Font = Enum.Font.GothamBlack
+        titulo.TextSize = 22
+        titulo.TextXAlignment = Enum.TextXAlignment.Left
+        titulo.ZIndex = 51 
+        titulo.Parent = frameItem
+
+        local descricao = Instance.new("TextLabel")
+        descricao.Size = UDim2.new(0.6, 0, 0.3, 0)
+        descricao.Position = UDim2.new(0, 100, 0, 35)
+        descricao.BackgroundTransparency = 1
+        descricao.Text = skin.Desc
+        descricao.TextColor3 = Color3.new(1, 1, 1)
+        descricao.Font = Enum.Font.GothamMedium
+        descricao.TextSize = 16
+        descricao.TextXAlignment = Enum.TextXAlignment.Left
+        descricao.ZIndex = 51 
+        descricao.Parent = frameItem
+
+        local btnAcao = Instance.new("TextButton")
+        btnAcao.Size = UDim2.new(0, 140, 0, 35)
+        btnAcao.Position = UDim2.new(0, 100, 0, 65)
+        btnAcao.Font = Enum.Font.GothamBold
+        btnAcao.TextSize = 14
+        btnAcao.ZIndex = 52 
+        btnAcao.Parent = frameItem
+        Instance.new("UICorner", btnAcao).CornerRadius = UDim.new(0.5, 0)
+
+        -- ======== LÓGICA DE ESTADO DO BOTÃO ========
+        local jaPossui = table.find(dadosJogador.SkinsCompradas, skin.Id)
+        local estaEquipado = (dadosJogador.SkinEquipada == skin.Id)
+
+        if estaEquipado then
+            btnAcao.Text = "EQUIPADO"
+            btnAcao.BackgroundColor3 = Color3.fromRGB(200, 105, 50) -- Laranja
+            btnAcao.TextColor3 = Color3.new(1, 1, 1)
+        elseif jaPossui then
+            btnAcao.Text = "EQUIPAR"
+            btnAcao.BackgroundColor3 = Color3.fromRGB(0, 150, 255) -- Azul
+            btnAcao.TextColor3 = Color3.new(1, 1, 1)
+            
+            btnAcao.Activated:Connect(function()
+                Eventos.ShopActionEvent:FireServer("Equipar", skin.Id)
+            end)
+        else
+            btnAcao.Text = skin.Preco .. " PTS - COMPRAR"
+            
+            -- Se não tiver dinheiro, deixa o botão cinza
+            if dadosJogador.Pontos >= skin.Preco then
+                btnAcao.BackgroundColor3 = Color3.fromRGB(0, 196, 39) -- Verde
+            else
+                btnAcao.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Cinza
+            end
+            
+            btnAcao.TextColor3 = Color3.new(1, 1, 1)
+            
+            btnAcao.Activated:Connect(function()
+                if dadosJogador.Pontos >= skin.Preco then
+                    Eventos.ShopActionEvent:FireServer("Comprar", skin.Id)
+                else
+                    btnAcao.Text = "PONTOS INSUFICIENTES"
+                    task.delay(1.5, function()
+                        if btnAcao then btnAcao.Text = skin.Preco .. " PTS - COMPRAR" end
+                    end)
+                end
+            end)
+        end
+    end
 end
 
 function GerenciadorUI.DefinirCallbackEmote(callback)
@@ -886,7 +1030,9 @@ function GerenciadorUI.AdicionarCartaMao(valor, naipe)
     btnImg.Size = UDim2.new(1, 0, 1, 0) -- Pega 100% da caixa
     btnImg.BackgroundTransparency = 1 -- Fundo invisivel
     
-    CardSettings.AplicarSkinCarta(btnImg, valor, naipe, false, "Padrao")
+    -- Lê a variável 'dadosJogador' que sincronizamos na Etapa 1
+    local minhaSkin = dadosJogador.SkinEquipada or "Padrao"
+    CardSettings.AplicarSkinCarta(btnImg, valor, naipe, false, minhaSkin)
     btnImg.Parent = conteinerCarta
     
     local curva = Instance.new("UICorner")
@@ -1000,12 +1146,20 @@ function GerenciadorUI.OcultarOpcoesJogada()
 end
 
 -- [MÉTODO] Adiciona a carta na mesa visual (centro da tela do cliente)
-function GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, escondida)
+-- [MÉTODO] Adiciona a carta na mesa visual (centro da tela do cliente)
+function GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, escondida, nomeSkin)
     local cartaImg = Instance.new("ImageLabel")
     cartaImg.Size = UDim2.new(0, 110, 0, 160) -- Tamanho fixo da imagem
     cartaImg.BackgroundTransparency = 1 -- Invisível
     
-    CardSettings.AplicarSkinCarta(cartaImg, valor, naipe, escondida, "Padrao")
+    CardSettings.AplicarSkinCarta(cartaImg, valor, naipe, escondida, nomeSkin)
+    
+    -- ======== MUDANÇA AQUI: Adiciona cantos arredondados ========
+    -- Criamos o elemento UICorner para cortar os cantos
+    local curva = Instance.new("UICorner")
+    curva.CornerRadius = UDim.new(0, 8) -- Arredonda 8px, exatamente como na mão para consistência
+    curva.Parent = cartaImg -- Anexa à imagem da carta
+    -- ============================================================
     
     local etiquetaNome = Instance.new("TextLabel")
     etiquetaNome.Text = nomeJogador -- De quem é a carta
@@ -1340,6 +1494,80 @@ function GerenciadorUI.MostrarAvisoFuga(texto)
             local tween = TweenService:Create(lblFuga, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
             tween:Play()
             tween.Completed:Connect(function() lblFuga:Destroy() end)
+        end
+    end)
+end
+
+-- [MÉTODO] Painel Secreto do Desenvolvedor
+function GerenciadorUI.CriarMenuAdmin()
+    if jogadorLocal.Name ~= "Nick0369me" then return end -- Se não for você, nem cria a interface!
+
+    local painelAdmin = Instance.new("Frame")
+    painelAdmin.Size = UDim2.new(0, 260, 0, 170)
+    painelAdmin.Position = UDim2.new(0.5, 0, 0, 10)
+    painelAdmin.AnchorPoint = Vector2.new(0.5, 0)
+    painelAdmin.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    painelAdmin.Visible = false
+    painelAdmin.ZIndex = 200
+    painelAdmin.Parent = painelTela
+    Instance.new("UICorner", painelAdmin).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", painelAdmin).Color = Color3.new(1, 0.8, 0) -- Borda dourada
+
+    local titulo = Instance.new("TextLabel", painelAdmin)
+    titulo.Size = UDim2.new(1, 0, 0, 30)
+    titulo.Text = "🛡️ PAINEL ADMIN (F4)"
+    titulo.TextColor3 = Color3.new(1, 0.8, 0)
+    titulo.Font = Enum.Font.GothamBlack
+    titulo.BackgroundTransparency = 1
+
+    local inputNome = Instance.new("TextBox", painelAdmin)
+    inputNome.Size = UDim2.new(0.9, 0, 0, 35)
+    inputNome.Position = UDim2.new(0.05, 0, 0, 40)
+    inputNome.PlaceholderText = "Nome do Jogador"
+    inputNome.Text = jogadorLocal.Name -- Já vem preenchido com seu nome por praticidade
+    inputNome.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    inputNome.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", inputNome)
+
+    local inputValor = Instance.new("TextBox", painelAdmin)
+    inputValor.Size = UDim2.new(0.9, 0, 0, 35)
+    inputValor.Position = UDim2.new(0.05, 0, 0, 85)
+    inputValor.PlaceholderText = "Quantidade"
+    inputValor.Text = "300"
+    inputValor.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    inputValor.TextColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", inputValor)
+
+    local btnAdd = Instance.new("TextButton", painelAdmin)
+    btnAdd.Size = UDim2.new(0.42, 0, 0, 35)
+    btnAdd.Position = UDim2.new(0.05, 0, 0, 125)
+    btnAdd.BackgroundColor3 = Color3.fromRGB(0, 150, 60)
+    btnAdd.Text = "+ DAR PTS"
+    btnAdd.TextColor3 = Color3.new(1, 1, 1)
+    btnAdd.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btnAdd)
+
+    local btnRem = Instance.new("TextButton", painelAdmin)
+    btnRem.Size = UDim2.new(0.42, 0, 0, 35)
+    btnRem.Position = UDim2.new(0.53, 0, 0, 125)
+    btnRem.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    btnRem.Text = "- TIRAR PTS"
+    btnRem.TextColor3 = Color3.new(1, 1, 1)
+    btnRem.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btnRem)
+
+    -- Ações dos Botões
+    btnAdd.Activated:Connect(function()
+        Eventos.AdminActionEvent:FireServer("Adicionar", inputNome.Text, inputValor.Text)
+    end)
+    btnRem.Activated:Connect(function()
+        Eventos.AdminActionEvent:FireServer("Remover", inputNome.Text, inputValor.Text)
+    end)
+
+    -- Abrir e fechar com F4
+    game:GetService("UserInputService").InputBegan:Connect(function(input, emChat)
+        if not emChat and input.KeyCode == Enum.KeyCode.F4 then
+            painelAdmin.Visible = not painelAdmin.Visible
         end
     end)
 end

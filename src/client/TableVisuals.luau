@@ -70,12 +70,13 @@ local function ObterDadosAssentoEAvatar(alvo)
 end
 
 -- [MÉTODO] Cria a carta fisicamente na mesa e a joga no centro
-function VisuaisMesa.GerarCarta(jogadorOuNome, valor, naipe, estaEscondida)
+function VisuaisMesa.GerarCarta(jogadorOuNome, valor, naipe, estaEscondida, nomeSkin)
     if not pastaMesaAtual or not containerCartas or not tampoMesa then return end
 
-    -- 1. Descobrir Cadeira e Avatar de uma vez só usando nossa função simplificada
     local numCadeira, personagemAlvo = ObterDadosAssentoEAvatar(jogadorOuNome)
     local nomeJogador = typeof(jogadorOuNome) == "Instance" and jogadorOuNome.Name or jogadorOuNome
+    
+    nomeSkin = nomeSkin or "Padrao" -- Garantia de segurança
 
     -- 2. Criação da Carta (Part 3D)
     local pecaCarta = Instance.new("Part")
@@ -99,15 +100,14 @@ function VisuaisMesa.GerarCarta(jogadorOuNome, valor, naipe, estaEscondida)
     imgCima.Parent = guiCima
     
     -- Aplica na parte de Cima (Aberta ou Escondida baseada na jogada)
-    CardSettings.AplicarSkinCarta(imgCima, valor, naipe, estaEscondida, "Padrao")
+    CardSettings.AplicarSkinCarta(imgCima, valor, naipe, estaEscondida, nomeSkin)
     
     local guiBaixo = guiCima:Clone()
     guiBaixo.Face = Enum.NormalId.Bottom
     guiBaixo.Parent = pecaCarta
     
-    -- A parte de Baixo (costas da carta) é sempre escondida=true
-    CardSettings.AplicarSkinCarta(guiBaixo.ImageLabel, valor, naipe, true, "Padrao")
-
+    CardSettings.AplicarSkinCarta(guiBaixo.ImageLabel, valor, naipe, true, nomeSkin)
+    
     -- 3. Ponto de Partida (Do peito ou de cima da mesa)
     local posInicial = tampoMesa.Position + Vector3.new(0, 4, 0)
     if personagemAlvo and personagemAlvo:FindFirstChild("HumanoidRootPart") then

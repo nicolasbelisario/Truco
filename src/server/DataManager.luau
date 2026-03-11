@@ -1,6 +1,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
 local Eventos = ReplicatedStorage:WaitForChild("Events")
 
 -- Cria o banco de dados
@@ -109,6 +110,123 @@ function DataManager.ObterSkinEquipada(jogador)
         return dados.SkinEquipada
     end
     return "Padrao"
+end
+
+-- ========================================================
+-- SISTEMA DE LOJA (COMPRAS E EQUIPAMENTOS)
+-- ========================================================
+
+-- Tabela de preços oficial do Servidor (Segurança contra hacks)
+local PRECOS_SKINS = {
+    ["Padrao"] = 0,
+    ["Rosa"] = 200,
+    ["Nacional"] = 300,
+    ["Estrela"] = 300,
+}
+
+Eventos.ShopActionEvent.OnServerEvent:Connect(function(jogador, acao, idSkin)
+    local dados = dadosSessao[jogador]
+    if not dados then return end
+
+    if acao == "Comprar" then
+        local preco = PRECOS_SKINS[idSkin]
+        
+        -- Checa se a skin existe, se tem pontos e se JÁ NÃO TEM a skin
+        if preco and dados.Pontos >= preco and not table.find(dados.SkinsCompradas, idSkin) then
+            dados.Pontos -= preco
+            table.insert(dados.SkinsCompradas, idSkin)
+            print(jogador.Name .. " comprou a skin: " .. idSkin)
+            
+            -- Atualiza o placar nativo
+            local leaderstats = jogador:FindFirstChild("leaderstats")
+            if leaderstats and leaderstats:FindFirstChild("Pontos") then
+                leaderstats.Pontos.Value = dados.Pontos
+            end
+            
+            DataManager.SincronizarComCliente(jogador)
+            
+            -- Opcional: Tocar um som de compra (Ka-Ching) no cliente seria legal!
+        end
+        
+    elseif acao == "Equipar" then
+        -- Só equipa se ele realmente possuir a skin
+        if table.find(dados.SkinsCompradas, idSkin) then
+            dados.SkinEquipada = idSkin
+            print(jogador.Name .. " equipou a skin: " .. idSkin)
+            DataManager.SincronizarComCliente(jogador)
+        end
+    end
+end)
+
+-- ========================================================
+-- PAINEL ADMIN (SÓ PARA O DESENVOLVEDOR)
+-- ========================================================
+local NOME_ADMIN = "Nick0369me" -- Seu nick exato no Roblox
+
+Eventos:WaitForChild("AdminActionEvent").OnServerEvent:Connect(function(jogadorLogado, acao, alvoNome, quantidadeStr)
+    -- Trava de segurança absoluta: Se não for você, ignora!
+    if jogadorLogado.Name ~= NOME_ADMIN then return end
+
+    local jogadorAlvo = Players:FindFirstChild(alvoNome)
+    if not jogadorAlvo then return end
+
+    local quantidade = tonumber(quantidadeStr) or 0
+
+    if acao == "Adicionar" then
+        DataManager.AdicionarPontos(jogadorAlvo, quantidade)
+        print("ADMIN: Deu " .. quantidade .. " pontos para " .. alvoNome)
+    elseif acao == "Remover" then
+        DataManager.AdicionarPontos(jogadorAlvo, -quantidade)
+        print("ADMIN: Tirou " .. quantidade .. " pontos de " .. alvoNome)
+    end
+end)
+
+
+-- ========================================================
+-- SISTEMA DE COMPRAS COM ROBUX (PROCESSAMENTO DE RECIBOS)
+-- ========================================================
+
+-- Mapeamento: [ID do Produto de Desenvolvedor] = Quantidade de Pontos que o jogador ganha
+local PRODUTOS_DE_PONTOS = {
+    [3554291316] = 100, -- Substitua pelo ID real do pacote de 100 pontos
+    [3554291580] = 500, -- Substitua pelo ID real do pacote de 500 pontos
+}
+
+-- IDs das doações (só precisamos saber para confirmar a compra e agradecer)
+local IDs_DOACOES = {
+    [3549774213] = true,
+    [3549774425] = true,
+}
+
+MarketplaceService.ProcessReceipt = function(infoRecibo)
+    -- Descobre quem fez a compra
+    local jogador = Players:GetPlayerByUserId(infoRecibo.PlayerId)
+    
+    if not jogador then
+        -- Se o jogador saiu do jogo antes da compra terminar, manda o Roblox tentar de novo depois
+        return Enum.ProductPurchaseDecision.NotProcessedYet
+    end
+
+    local idProduto = infoRecibo.ProductId
+
+    -- 1. Verifica se foi um pacote de Pontos
+    local pontosParaDar = PRODUTOS_DE_PONTOS[idProduto]
+    if pontosParaDar then
+        DataManager.AdicionarPontos(jogador, pontosParaDar)
+        print("Sucesso! " .. jogador.Name .. " comprou " .. pontosParaDar .. " pontos com Robux.")
+        return Enum.ProductPurchaseDecision.PurchaseGranted
+    end
+
+    -- 2. Verifica se foi uma Doação
+    if IDs_DOACOES[idProduto] then
+        print("Sucesso! " .. jogador.Name .. " fez uma doação. Muito obrigado!")
+        -- Aqui você poderia dar um emblema, soltar fogos de artifício, etc.
+        return Enum.ProductPurchaseDecision.PurchaseGranted
+    end
+
+    -- Se chegou aqui, o ID não está cadastrado em lugar nenhum
+    warn("Produto não reconhecido comprado: " .. tostring(idProduto))
+    return Enum.ProductPurchaseDecision.NotProcessedYet
 end
 
 -- Conexões automáticas de entrada e saída

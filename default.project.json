@@ -14,7 +14,9 @@
         "CardPlayedOnTable": { "$className": "RemoteEvent" },
         "TrucoEvent": { "$className": "RemoteEvent" },
         "SignalEvent": { "$className": "RemoteEvent" },
-        "SyncDataEvent": { "$className": "RemoteEvent" }
+        "SyncDataEvent": { "$className": "RemoteEvent" },
+        "ShopActionEvent": { "$className": "RemoteEvent" },
+        "AdminActionEvent": { "$className": "RemoteEvent" }
       },
       "Shared": {
         "$path": "src/shared"

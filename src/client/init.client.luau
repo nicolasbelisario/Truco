@@ -196,16 +196,23 @@ Eventos.UpdateTurnEvent.OnClientEvent:Connect(function(nomeJogador, numeroQueda)
     GerenciadorUI.AtualizarTurno(nomeJogador, numeroQueda)
 end)
 
-Eventos.CardPlayedOnTable.OnClientEvent:Connect(function(nomeJogador, valor, naipe, estaEscondida)
-    GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, estaEscondida)
+Eventos.CardPlayedOnTable.OnClientEvent:Connect(function(nomeJogador, valor, naipe, estaEscondida, nomeSkin)
+    -- Passa a skin pra UI 2D
+    GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, estaEscondida, nomeSkin)
     GerenciadorUI.TocarSom("CardPlay")
     
+    -- Passa a skin pra Mesa 3D
     local jogador = Players:FindFirstChild(nomeJogador)
     if jogador then
-        VisuaisMesa.GerarCarta(jogador, valor, naipe, estaEscondida)
+        VisuaisMesa.GerarCarta(jogador, valor, naipe, estaEscondida, nomeSkin)
     else
-        VisuaisMesa.GerarCarta(nomeJogador, valor, naipe, estaEscondida)
+        VisuaisMesa.GerarCarta(nomeJogador, valor, naipe, estaEscondida, nomeSkin)
     end
+end)
+
+-- Sincroniza os dados do Banco de Dados com a Interface Visual
+Eventos.SyncDataEvent.OnClientEvent:Connect(function(dados)
+    GerenciadorUI.AtualizarDadosJogador(dados)
 end)
 
 -- ==========================================
