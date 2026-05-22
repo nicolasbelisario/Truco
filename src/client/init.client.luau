@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local jogadorLocal = Players.LocalPlayer
 
 -- Módulos do Cliente
-local GerenciadorUI = require(script:WaitForChild("UIManager"))
+local GerenciadorUI = require(script:WaitForChild("UI"):WaitForChild("UIManager"))
 local VisuaisMesa = require(script:WaitForChild("TableVisuals"))
 local Eventos = ReplicatedStorage:WaitForChild("Events")
 

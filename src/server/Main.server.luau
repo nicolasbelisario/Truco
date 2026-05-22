@@ -1,7 +1,11 @@
 local GerenciadorMesas = require(script.Parent:WaitForChild("TableManager"))
-local DataManager = require(script.Parent:WaitForChild("DataManager"))
-local pastaMesas = workspace:WaitForChild("MesasFolder") 
 
+require(script.Parent:WaitForChild("DataManager"))
+require(script.Parent:WaitForChild("ShopManager"))
+require(script.Parent:WaitForChild("RobuxManager"))
+require(script.Parent:WaitForChild("AdminManager"))
+
+local pastaMesas = workspace:WaitForChild("MesasFolder") 
 GerenciadorMesas.Inicializar(pastaMesas)
 
-print("Servidor de Truco Iniciado com Sucesso!")
+print("Servidor de Truco (Refatorado SOLID) Iniciado com Sucesso!")
