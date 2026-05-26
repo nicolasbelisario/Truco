@@ -6,6 +6,11 @@ local EventBroadcaster = require(script.Parent:WaitForChild("EventBroadcaster"))
 local RoundManager = {}
 RoundManager.__index = RoundManager
 
+--[[
+    Instancia um novo gerenciador de rodadas (Mãos) de Truco.
+    @param ctx table: Contexto da Partida (Match).
+    @return table: Nova instância do RoundManager.
+]]
 function RoundManager.novo(ctx)
     local self = setmetatable({}, RoundManager)
     self.Ctx = ctx 
@@ -13,10 +18,15 @@ function RoundManager.novo(ctx)
     return self
 end
 
+--[[
+    Redefine as variáveis internas da rodada para o estado zero,
+    usado no fim da partida ou quando o estado precisa ser limpo completamente.
+]]
 function RoundManager:ResetarEstado()
     self.BaralhoAtual = {}
     self.CartasNaMesa = {}
     self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
+    self.HistoricoQuedas = {}
     self.ViraAtual = nil
     self.ValorRodada = 1
     self.IndexDistribuidor = 1
@@ -24,9 +34,15 @@ function RoundManager:ResetarEstado()
     self.MaosJogadores = {} 
 end
 
+--[[
+    Inicia uma nova "Mão" (rodada valendo pontos no placar).
+    Limpa o estado da rodada, gera um novo baralho, embaralha e define
+    quem é o responsável por realizar o corte do baralho (Cutting).
+]]
 function RoundManager:IniciarNovaRodada()
     local ctx = self.Ctx
     self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
+    self.HistoricoQuedas = {}
     self.CartasNaMesa = {}
     self.ValorRodada = 1
     self.MaosJogadores = {}
@@ -57,6 +73,12 @@ function RoundManager:IniciarNovaRodada()
     end)
 end
 
+--[[
+    Aplica o corte no baralho caso o jogador que solicitou o corte seja 
+    realmente o jogador definido como "Cortador" na rodada atual.
+    @param jogador Player/Bot: Quem enviou a ação de corte.
+    @param quantidade number: O tipo de corte escolhido.
+]]
 function RoundManager:CortarBaralho(jogador, quantidade)
     local ctx = self.Ctx
     if ctx.Estado ~= "CUTTING" then return end
@@ -68,6 +90,11 @@ function RoundManager:CortarBaralho(jogador, quantidade)
     end
 end
 
+--[[
+    Remove as cartas do topo do baralho e distribui 3 para cada um dos
+    4 jogadores na mesa. Em seguida, vira a carta do meio (O Vira)
+    e avança para o início das jogadas (PLAYING).
+]]
 function RoundManager:DistribuirCartas()
     local ctx = self.Ctx
     ctx.Estado = "DEALING"
@@ -102,13 +129,17 @@ function RoundManager:DistribuirCartas()
     self:AvancarTurno()
 end
 
+--[[
+    Avança a rodada para o próximo jogador (turno), informando aos clientes
+    de quem é a vez e engatilhando o bot se for a vez de um.
+]]
 function RoundManager:AvancarTurno()
     local ctx = self.Ctx
     local jogadorVez = ctx.Assentos["Cadeira"..self.IndexTurnoAtual]
     if not jogadorVez then return end
     
     local nomeVez = ctx:EBot(jogadorVez) and jogadorVez.Nome or jogadorVez.Name
-    local numRodada = self.QuedasGanhas.TeamA + self.QuedasGanhas.TeamB + 1
+    local numRodada = #self.HistoricoQuedas + 1
     
     EventBroadcaster.AtualizarTurno(ctx:ObterHumanos(), nomeVez, numRodada)
     
@@ -117,6 +148,16 @@ function RoundManager:AvancarTurno()
     end
 end
 
+--[[
+    Recebe e valida a tentativa de um jogador (ou Bot) de jogar uma carta na mesa.
+    Verifica se a carta está realmente na mão do jogador (Anti-Cheat).
+    Se for a 4ª carta da mesa, aciona a avaliação de quem venceu a queda.
+    @param jogador Player/Bot: O jogador que está jogando a carta.
+    @param valor string: O valor da carta.
+    @param naipe string: O naipe da carta.
+    @param escondida boolean: Se o jogador decidiu jogar a carta virada para baixo.
+    @param skinUsada string: A skin cosmética equipada pelo jogador.
+]]
 function RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
     local ctx = self.Ctx
     if ctx.TrucoHandler.Estado.AguardandoResposta or ctx.Estado ~= "PLAYING" then return end
@@ -141,7 +182,7 @@ function RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
         return
     end
 
-    local numRodada = self.QuedasGanhas.TeamA + self.QuedasGanhas.TeamB + 1
+    local numRodada = #self.HistoricoQuedas + 1
     if numRodada == 1 then escondida = false end 
 
     table.insert(self.CartasNaMesa, { Player = jogador, Value = valor, Suit = naipe, IsHidden = escondida, Skin = skinUsada })
@@ -158,6 +199,11 @@ function RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
     end
 end
 
+--[[
+    Analisa as 4 cartas jogadas na mesa em uma queda e determina o vencedor
+    baseado na força das cartas. Adiciona o resultado ao histórico e, se
+    uma equipe vencer 2 quedas (ou pela regra de desempate da canga), finaliza a mão.
+]]
 function RoundManager:AvaliarQueda()
     local ctx = self.Ctx
     local vencedorObj = GerenciadorRegras.ObterVencedorRodada(self.CartasNaMesa, self.ViraAtual.Value)
@@ -165,26 +211,61 @@ function RoundManager:AvaliarQueda()
     
     if vencedorObj == "DRAW" then
         local primeiroJogar = self.CartasNaMesa[1].Player
-        equipeVencedora = ctx:ObterEquipe(primeiroJogar)
+        equipeVencedora = "DRAW"
         self:DefinirVezParaJogador(primeiroJogar)
     else
         equipeVencedora = ctx:ObterEquipe(vencedorObj)
         self:DefinirVezParaJogador(vencedorObj)
     end
     
-    self.QuedasGanhas["Team"..equipeVencedora] += 1
+    table.insert(self.HistoricoQuedas, equipeVencedora)
+    
+    if equipeVencedora ~= "DRAW" then
+        self.QuedasGanhas["Team"..equipeVencedora] += 1
+    end
+    
     self.CartasNaMesa = {} 
     
     EventBroadcaster.ParaTodos(ctx.Assentos, "CLEAR_TABLE", {TeamA = self.QuedasGanhas.TeamA, TeamB = self.QuedasGanhas.TeamB}, ctx.VerificarBot)
     
-    if self.QuedasGanhas["Team"..equipeVencedora] >= 2 then 
-        ctx:FinalizarMao(equipeVencedora, self.ValorRodada)
+    local vencedorMao = nil
+    local q1, q2, q3 = self.HistoricoQuedas[1], self.HistoricoQuedas[2], self.HistoricoQuedas[3]
+    
+    if q1 == "A" then
+        if q2 == "A" or q2 == "DRAW" then vencedorMao = "A"
+        elseif q2 == "B" then
+            if q3 == "A" or q3 == "DRAW" then vencedorMao = "A"
+            elseif q3 == "B" then vencedorMao = "B" end
+        end
+    elseif q1 == "B" then
+        if q2 == "B" or q2 == "DRAW" then vencedorMao = "B"
+        elseif q2 == "A" then
+            if q3 == "B" or q3 == "DRAW" then vencedorMao = "B"
+            elseif q3 == "A" then vencedorMao = "A" end
+        end
+    elseif q1 == "DRAW" then
+        if q2 == "A" then vencedorMao = "A"
+        elseif q2 == "B" then vencedorMao = "B"
+        elseif q2 == "DRAW" then
+            if q3 == "A" then vencedorMao = "A"
+            elseif q3 == "B" then vencedorMao = "B"
+            elseif q3 == "DRAW" then vencedorMao = "DRAW" end
+        end
+    end
+    
+    if vencedorMao then 
+        ctx:FinalizarMao(vencedorMao, self.ValorRodada)
     else 
         task.wait(1)
         self:AvancarTurno() 
     end
 end
 
+--[[
+    Calcula as posições na mesa para determinar quem é o Distribuidor (Dealer),
+    quem Corta o baralho (próximo à direita) e quem joga a primeira carta (o Pé/Mão).
+    @return table: Dicionário contendo os nomes das cadeiras correspondentes aos papéis.
+]]
 function RoundManager:ObterPapeis()
     local d = self.IndexDistribuidor
     local c = (d % 4) + 1
@@ -193,6 +274,11 @@ function RoundManager:ObterPapeis()
     return { Dealer="Cadeira"..d, Corte="Cadeira"..c, Mao="Cadeira"..m }
 end
 
+--[[
+    Altera o índice de turno para corresponder ao assento (cadeira)
+    do jogador especificado, para que ele inicie a próxima rodada/jogada.
+    @param jogador Player/Bot: O jogador que deve receber a vez.
+]]
 function RoundManager:DefinirVezParaJogador(jogador)
     for nomeAssento, jog in pairs(self.Ctx.Assentos) do 
         if jog == jogador then 

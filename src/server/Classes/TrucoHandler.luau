@@ -3,6 +3,11 @@ local EventBroadcaster = require(script.Parent.EventBroadcaster)
 local TrucoHandler = {}
 TrucoHandler.__index = TrucoHandler
 
+--[[
+    Instancia um novo gerenciador de Truco (desafios de pontos).
+    @param ctx table: O contexto da partida atual (instância da Match).
+    @return table: A nova instância de TrucoHandler.
+]]
 function TrucoHandler.novo(ctx)
     local self = setmetatable({}, TrucoHandler)
     self.Ctx = ctx
@@ -10,6 +15,10 @@ function TrucoHandler.novo(ctx)
     return self
 end
 
+--[[
+    Redefine o estado do desafio de Truco para os valores padrão,
+    usado quando uma nova rodada começa.
+]]
 function TrucoHandler:Resetar()
     self.Estado = {
         ValorAtual = 1, ValorPendente = 0, EquipePediu = nil,
@@ -17,6 +26,11 @@ function TrucoHandler:Resetar()
     }
 end
 
+--[[
+    Processa um pedido de Truco vindo de um jogador. Verifica se é válido e 
+    transmite o desafio para a equipe adversária.
+    @param jogador Player/Bot: O jogador que está pedindo Truco.
+]]
 function TrucoHandler:ProcessarRequest(jogador)
     local ctx = self.Ctx
     local minha = ctx:ObterEquipe(jogador)
@@ -35,6 +49,13 @@ function TrucoHandler:ProcessarRequest(jogador)
     self:_PedirResposta((minha == "A") and "B" or "A", prox, jogador)
 end
 
+--[[
+    Processa a resposta de um jogador ao desafio de Truco.
+    Pode ser "Aceitar", "Correr" ou "Aumentar".
+    Se houver um parceiro humano, aguarda a resposta do parceiro para tomar a decisão se os votos combinarem.
+    @param jogador Player/Bot: O jogador que está respondendo.
+    @param subAcao string: A decisão do jogador ("Aceitar", "Correr", "Aumentar").
+]]
 function TrucoHandler:ProcessarResponse(jogador, subAcao)
     if not self.Estado.AguardandoResposta then return end
     local ctx = self.Ctx
@@ -73,6 +94,12 @@ function TrucoHandler:ProcessarResponse(jogador, subAcao)
     if votoParceiro == subAcao then executar(subAcao) end
 end
 
+--[[
+    Resolve internamente o fim do desafio de Truco, notificando a partida sobre o desfecho
+    e aplicando as consequências (atualizar valor ou finalizar rodada se correram).
+    @param aceitou boolean: Se a equipe alvo aceitou o Truco.
+    @param correu boolean: Se a equipe alvo correu/fugiu do Truco.
+]]
 function TrucoHandler:_Resolver(aceitou, correu)
     local ctx = self.Ctx
     self.Estado.AguardandoResposta = false
@@ -92,6 +119,13 @@ function TrucoHandler:_Resolver(aceitou, correu)
     end
 end
 
+--[[
+    Função interna para disparar a solicitação visual de resposta ao Truco para a equipe desafiada.
+    Também gerencia o timeout de resposta (tempo esgotado faz a equipe correr).
+    @param equipeAlvo string: A equipe que está sendo desafiada ("A" ou "B").
+    @param valor number: O valor do Truco que está sendo pedido.
+    @param quemPediu Player/Bot: O jogador que gritou o Truco.
+]]
 function TrucoHandler:_PedirResposta(equipeAlvo, valor, quemPediu)
     local ctx = self.Ctx
     local idAtual = self.Estado.IDDesafio

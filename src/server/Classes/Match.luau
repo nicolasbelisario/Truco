@@ -10,6 +10,12 @@ local BotDummyTemplate = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("
 local Partida = {}
 Partida.__index = Partida
 
+--[[
+    Instancia uma nova Partida (Match) vinculada a um modelo 3D de mesa no mundo.
+    @param modeloMesa Instance: O modelo 3D da mesa de Truco.
+    @param listaAssentosBots table: Uma lista (opcional) de índices indicando quais cadeiras serão preenchidas por Bots.
+    @return table: A nova instância da Partida.
+]]
 function Partida.nova(modeloMesa, listaAssentosBots)
     local self = setmetatable({}, Partida)
     
@@ -33,6 +39,10 @@ function Partida.nova(modeloMesa, listaAssentosBots)
     return self
 end
 
+--[[
+    Vasculha o modelo 3D da mesa em busca de objetos "Seat" (cadeiras)
+    e vincula eventos para detectar quando jogadores sentam ou levantam.
+]]
 function Partida:ConfigurarAssentos()
     local pastaCadeiras = self.Modelo:WaitForChild("Cadeiras")
     for _, filho in ipairs(pastaCadeiras:GetChildren()) do
@@ -54,6 +64,10 @@ function Partida:ConfigurarAssentos()
     end)
 end
 
+--[[
+    Cria e posiciona as instâncias de Bots nos assentos definidos durante a
+    criação da partida. Também invoca a geração dos avatares físicos para eles.
+]]
 function Partida:InicializarBots()
     local mapaNomes = {[1]="Bot 1", [2]="Bot Rival 1", [3]="Bot Parceiro", [4]="Bot Rival 2"}
     for _, indexAssento in ipairs(self.AssentosBots) do
@@ -66,6 +80,13 @@ function Partida:InicializarBots()
     end
 end
 
+--[[
+    Disparado quando alguém senta ou levanta de uma cadeira da mesa.
+    Trata a entrada de novos jogadores (mostrando a UI) e a saída de jogadores
+    (resetando a partida se ela já havia começado).
+    @param assento Seat: A instância do assento que teve mudança de ocupante.
+    @param nomeAssento string: O nome do assento (ex: "Cadeira1").
+]]
 function Partida:ProcessarMudancaAssento(assento, nomeAssento)
     local humanoide = assento.Occupant
     if humanoide then
@@ -95,6 +116,11 @@ function Partida:ProcessarMudancaAssento(assento, nomeAssento)
     end
 end
 
+--[[
+    Ativa ou desativa a capacidade de pular dos jogadores na mesa.
+    Usado para prender o jogador na cadeira durante a partida.
+    @param podePular boolean: Se o jogador deve ser capaz de pular (true) ou não (false).
+]]
 function Partida:DefinirPuloJogadores(podePular)
     for _, jog in pairs(self.Assentos) do
         if not self:EBot(jog) and jog.Character then
@@ -107,6 +133,10 @@ function Partida:DefinirPuloJogadores(podePular)
     end
 end
 
+--[[
+    Inicia uma contagem regressiva de 5 segundos antes de começar o jogo.
+    Se algum jogador levantar durante a contagem, ela é cancelada e volta a esperar.
+]]
 function Partida:IniciarContagem()
     self.Estado = "COUNTDOWN"
     for i = 5, 0, -1 do
@@ -121,6 +151,10 @@ function Partida:IniciarContagem()
     self:ComecarJogo()
 end
 
+--[[
+    Marca o início real da partida. Zera o placar, trava os jogadores nas cadeiras,
+    sorteia o primeiro distribuidor (dealer) e inicia a primeira rodada.
+]]
 function Partida:ComecarJogo()
     self:DefinirPuloJogadores(false)
     self.Placar = {TeamA = 0, TeamB = 0}
@@ -128,6 +162,11 @@ function Partida:ComecarJogo()
     self.RoundManager:IniciarNovaRodada()
 end
 
+--[[
+    Encerra a partida imediatamente, limpando a mesa, restaurando a interface
+    dos jogadores e destravando os pulos.
+    @param motivo string: Mensagem a ser exibida como motivo do fim da partida.
+]]
 function Partida:ResetarPartida(motivo)
     self:DefinirPuloJogadores(true)
     EventBroadcaster.ParaTodos(self.Assentos, "HIDE_GAME_UI", 0, self.VerificarBot)
@@ -139,11 +178,25 @@ function Partida:ResetarPartida(motivo)
     self.TrucoHandler:Resetar()
 end
 
+--[[
+    Delega a ação de jogar uma carta para o gerenciador da rodada.
+    @param jogador Player/Bot: O jogador que enviou a carta.
+    @param valor string: O valor da carta.
+    @param naipe string: O naipe da carta.
+    @param escondida boolean: Se a carta deve ser jogada coberta.
+]]
 function Partida:JogadorJogarCarta(jogador, valor, naipe, escondida)
     local skinUsada = self:EBot(jogador) and "Padrao" or DataManager.ObterSkinEquipada(jogador)
     self.RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
 end
 
+--[[
+    Roteia as ações relacionadas ao Truco (pedir, aceitar, correr, aumentar)
+    para o TrucoHandler.
+    @param jogador Player/Bot: O jogador que realizou a ação.
+    @param acao string: O tipo da ação ("Request" ou "Response").
+    @param subAcao string: (Opcional) A resposta ("Aceitar", "Correr", "Aumentar").
+]]
 function Partida:ProcessarAcaoTruco(jogador, acao, subAcao)
     if acao == "Request" then
         self.TrucoHandler:ProcessarRequest(jogador)
@@ -152,22 +205,43 @@ function Partida:ProcessarAcaoTruco(jogador, acao, subAcao)
     end
 end
 
+--[[
+    Delega a ação de cortar o baralho para o gerenciador da rodada.
+    @param jogador Player/Bot: O jogador que está cortando.
+    @param quantidade number: O número correspondente ao tipo de corte.
+]]
 function Partida:JogadorCortarBaralho(jogador, quantidade)
     self.RoundManager:CortarBaralho(jogador, quantidade)
 end
 
+--[[
+    Delega a transmissão de um sinal/emote visual para o EventBroadcaster.
+    @param jogador Player: O remetente do sinal.
+    @param tipoSinal string: Qual sinal foi emitido ("Sinal_Mao", "Sinal_Olhar").
+]]
 function Partida:TransmitirSinal(jogador, tipoSinal)
     EventBroadcaster.SinalEmote(self:ObterHumanos(), jogador, tipoSinal)
 end
 
+--[[
+    Acionada quando uma Mão (conjunto de 3 quedas) acaba.
+    Calcula os pontos da equipe vencedora, notifica os clientes e verifica se
+    alguma equipe alcançou os 12 pontos para vencer a partida inteira.
+    @param equipeVencedora string: A equipe que ganhou a mão ("A", "B" ou "DRAW").
+    @param valorRodada number: Quantos pontos a mão estava valendo.
+]]
 function Partida:FinalizarMao(equipeVencedora, valorRodada)
     self.Estado = "SCORING" 
     self.TrucoHandler.Estado.AguardandoResposta = false
 
-    self.Placar["Team"..equipeVencedora] += valorRodada 
+    if equipeVencedora == "DRAW" then
+        EventBroadcaster.ParaTodos(self.Assentos, "DRAW_HAND", {Value = 0}, self.VerificarBot)
+    else
+        self.Placar["Team"..equipeVencedora] += valorRodada 
+        local nomesVencedores = self:ObterNomesEquipe(equipeVencedora)
+        EventBroadcaster.ParaTodos(self.Assentos, "TEAM_"..equipeVencedora.."_WON_HAND", {Value = valorRodada, Names = nomesVencedores}, self.VerificarBot)
+    end
     
-    local nomesVencedores = self:ObterNomesEquipe(equipeVencedora)
-    EventBroadcaster.ParaTodos(self.Assentos, "TEAM_"..equipeVencedora.."_WON_HAND", {Value = valorRodada, Names = nomesVencedores}, self.VerificarBot)
     EventBroadcaster.ParaTodos(self.Assentos, "UPDATE_SCORE", self.Placar, self.VerificarBot)
     
     task.wait(3)
@@ -199,6 +273,12 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
     end
 end
 
+--[[
+    Callback acionado pelo TrucoHandler quando um pedido de Truco é aceito.
+    Atualiza o valor da rodada na partida e notifica a interface gráfica dos jogadores.
+    @param valorAtualizado number: O novo valor em pontos da rodada.
+    @param equipeQuePediu string: A equipe que solicitou o aumento ("A" ou "B").
+]]
 function Partida:OnTrucoAceito(valorAtualizado, equipeQuePediu)
     self.RoundManager.ValorRodada = valorAtualizado
     
@@ -229,23 +309,57 @@ function Partida:OnTrucoAceito(valorAtualizado, equipeQuePediu)
     end
 end
 
+--[[
+    Callback acionado pelo TrucoHandler quando uma equipe foge do Truco.
+    Encerra a mão atual e dá os pontos do valor *anterior* para a equipe vencedora.
+    @param equipeVencedora string: A equipe que pediu o truco e venceu por W.O.
+    @param valorAnterior number: O valor que a rodada valia antes de fugirem.
+]]
 function Partida:OnTrucoCorreu(equipeVencedora, valorAnterior)
     self.RoundManager.ValorRodada = valorAnterior
     self:FinalizarMao(equipeVencedora, valorAnterior)
 end
 
+--[[
+    Atualiza o valor da rodada na partida diretamente.
+    @param valor number: O novo valor da rodada.
+]]
 function Partida:OnValorAtualizado(valor)
     self.RoundManager.ValorRodada = valor
 end
 
+--[[
+    Retorna o valor atual da rodada em andamento.
+    @return number: O valor da rodada (1, 3, 6, 9 ou 12).
+]]
 function Partida:OnObterValorRodada()
     return self.RoundManager.ValorRodada
 end
 
+--[[
+    Verifica de forma segura se a entidade fornecida é um Bot do sistema.
+    @param entidade any: O objeto a ser verificado.
+    @return boolean: Verdadeiro se for Bot, Falso caso contrário.
+]]
 function Partida:EBot(entidade) return (entidade and typeof(entidade) == "table" and entidade.EBot == true) end
+
+--[[
+    Conta o número total de ocupantes atuais nas cadeiras da mesa (Humanos + Bots).
+    @return number: O número de jogadores sentados.
+]]
 function Partida:ContarJogadores() local c = 0; for _ in pairs(self.Assentos) do c += 1 end; return c end
+
+--[[
+    Recupera o jogador (ou Bot) que está sentado em uma cadeira específica.
+    @param nome string: O nome do assento (ex: "Cadeira2").
+    @return any: A entidade que ocupa a cadeira, ou nil se estiver vazia.
+]]
 function Partida:ObterJogadorPorCadeira(nome) return self.Assentos[nome] end
 
+--[[
+    Gera uma lista apenas com os jogadores humanos sentados na mesa, excluindo os Bots.
+    @return table: Uma lista de instâncias de Player.
+]]
 function Partida:ObterHumanos()
     local t = {}
     for _, jog in pairs(self.Assentos) do 
@@ -254,6 +368,12 @@ function Partida:ObterHumanos()
     return t
 end
 
+--[[
+    Determina a equipe de um jogador com base na numeração de sua cadeira.
+    Cadeiras ímpares (1 e 3) pertencem à Equipe A, cadeiras pares (2 e 4) à Equipe B.
+    @param jogador Player/Bot: O jogador a ter a equipe consultada.
+    @return string: O identificador da equipe ("A" ou "B").
+]]
 function Partida:ObterEquipe(jogador)
     for nomeAssento, jog in pairs(self.Assentos) do 
         if jog == jogador then 
@@ -264,6 +384,11 @@ function Partida:ObterEquipe(jogador)
     return "A"
 end
 
+--[[
+    Localiza o parceiro (companheiro de equipe) de um jogador específico.
+    @param jogador Player/Bot: O jogador que estamos analisando.
+    @return any: A entidade parceira, ou nil se não for encontrada.
+]]
 function Partida:ObterParceiro(jogador)
     local minhaEq = self:ObterEquipe(jogador); 
     for _, jog in pairs(self.Assentos) do 
@@ -272,6 +397,12 @@ function Partida:ObterParceiro(jogador)
     return nil
 end
 
+--[[
+    Gera uma string formatada contendo os nomes de todos os integrantes de uma equipe.
+    Exemplo: "João e Nick".
+    @param idEquipe string: O identificador da equipe ("A" ou "B").
+    @return string: Os nomes concatenados dos jogadores.
+]]
 function Partida:ObterNomesEquipe(idEquipe)
     local nomes = {}
     for _, jog in pairs(self.Assentos) do
@@ -282,6 +413,12 @@ function Partida:ObterNomesEquipe(idEquipe)
     return #nomes > 0 and table.concat(nomes, " e ") or "Ninguém"
 end
 
+--[[
+    Gera dinamicamente o avatar físico 3D (dummy) para representar um Bot na mesa.
+    Ele é instanciado a partir do template "BotDummy", renomeado e forçado a sentar.
+    @param nomeAssento string: O nome do assento (ex: "Cadeira1").
+    @param nomeExibicao string: O nome visível que ficará na cabeça do avatar.
+]]
 function Partida:GerarBotVisual(nomeAssento, nomeExibicao)
     local modeloAssento = self.Modelo:WaitForChild("Cadeiras"):FindFirstChild(nomeAssento)
     if not modeloAssento then return end

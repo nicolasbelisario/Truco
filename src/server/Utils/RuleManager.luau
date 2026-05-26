@@ -56,10 +56,8 @@ function GerenciadorRegras.ObterVencedorRodada(cartasJogadas, valorVira)
             vencedor = jogada.Player
             empatou = false
         elseif forcaAtual == maiorForca then
-            if maiorForca > 0 then
-                empatou = true
-                vencedor = nil 
-            end
+            empatou = true
+            vencedor = nil 
         end
     end
 

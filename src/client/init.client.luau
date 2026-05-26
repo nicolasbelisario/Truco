@@ -119,13 +119,15 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.OcultarMenuCorte()
         GerenciadorUI.TocarSom("Shuffle")
 
-    elseif mensagem == "TEAM_A_WON_HAND" or mensagem == "TEAM_B_WON_HAND" then
+    elseif mensagem == "TEAM_A_WON_HAND" or mensagem == "TEAM_B_WON_HAND" or mensagem == "DRAW_HAND" then
         trucoPendente = false 
         GerenciadorUI.OcultarDesafioTruco()
         GerenciadorUI.ResetarCamera()
         
         local textoVencedor = ""
-        if type(dados) == "table" and dados.Names then
+        if mensagem == "DRAW_HAND" then
+            textoVencedor = "Mão Empatada! Ninguém pontuou."
+        elseif type(dados) == "table" and dados.Names then
             textoVencedor = dados.Names .. " ganharam a mão!"
         else
             textoVencedor = (mensagem == "TEAM_A_WON_HAND") and "DUPLA A" or "DUPLA B"
