@@ -15,13 +15,13 @@ Este é um repositório para o jogo de **Truco Paulista** desenvolvido na plataf
 
 *Insira abaixo as capturas de tela ou GIFs demonstrando a interface, o lobby ou a mesa de jogo em funcionamento.*
 
-| Lobby / Tela Principal | Mesa de Jogo |
+| Lobby | Mesa de Jogo |
 | :---: | :---: |
-| `![Lobby](https://github.com/user-attachments/assets/7607e48e-fcbe-44f5-9951-04d28da3be35)` | `![Mesa](https://github.com/user-attachments/assets/26914ab0-dc98-4350-bb6e-c88b803be50b)` |
+| <img width="460.8" height="259.2" alt="Lobby" src="https://github.com/user-attachments/assets/43945dff-c42d-477d-9b77-f096fc7263cf" /> | <img width="460.8" height="259.2" alt="Mesa" src="https://github.com/user-attachments/assets/7607e48e-fcbe-44f5-9951-04d28da3be35" /> |
 
 | Sistema de Apostas (Truco!) | Visualização das Cartas |
 | :---: | :---: |
-| `![Grito de Truco](https://github.com/user-attachments/assets/43945dff-c42d-477d-9b77-f096fc7263cf)` | `![Cartas na Mão](https://github.com/user-attachments/assets/e7b85303-6c49-47ac-8582-718f5414a4d8)` |
+| <img height="432" alt="GritoTruco" src="https://github.com/user-attachments/assets/26914ab0-dc98-4350-bb6e-c88b803be50b" /> | <img height="432" alt="Cartas" src="https://github.com/user-attachments/assets/e7b85303-6c49-47ac-8582-718f5414a4d8" /> |
 
 ---
 
