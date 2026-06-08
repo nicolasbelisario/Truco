@@ -9,11 +9,11 @@
 
 Este é um repositório para o jogo de **Truco Paulista** desenvolvido na plataforma **Roblox**. O projeto traz a experiência do clássico jogo de cartas brasileiro de forma totalmente integrada e multijogador.
 
+Link do jogo: [Truco Paulista](https://www.roblox.com/games/96367147207107/Truco-Paulista#!/about)
+
 ---
 
 ## Demonstração do Jogo
-
-*Insira abaixo as capturas de tela ou GIFs demonstrando a interface, o lobby ou a mesa de jogo em funcionamento.*
 
 | Lobby | Mesa de Jogo |
 | :---: | :---: |
