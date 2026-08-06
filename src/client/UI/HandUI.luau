@@ -42,7 +42,7 @@ function HandUI.DefinirEstado(minhaVez, numQueda, truco, dados)
     if dados then dadosJogador = dados end
 end
 
-function HandUI.AdicionarCarta(valor, naipe)
+function HandUI.AdicionarCarta(card)
     local wrapper = Instance.new("Frame")
     wrapper.Name = "CardWrapper"
     wrapper.ClipsDescendants = false
@@ -51,10 +51,10 @@ function HandUI.AdicionarCarta(valor, naipe)
     wrapper.Parent = painelMao
 
     local btn = Instance.new("ImageButton")
-    btn.Name = valor .. "_" .. naipe
+    btn.Name = card.idUnico
     btn.Size = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
-    CardSettings.AplicarSkinCarta(btn, valor, naipe, false, dadosJogador.SkinEquipada or "Padrao")
+    CardSettings.AplicarSkinCarta(btn, card.Value, card.Suit, false, dadosJogador.SkinEquipada or "Padrao")
     btn.Parent = wrapper
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
@@ -74,10 +74,10 @@ function HandUI.AdicionarCarta(valor, naipe)
         if numeroQuedaAtual >= 2 then
             wrapper.ZIndex = 20
             -- Passa o método onJogarCarta junto para que o menu flutuante possa engatilhar a ação
-            if onPedirOpcoes then onPedirOpcoes(btn, valor, naipe, wrapper, onJogarCarta) end
+            if onPedirOpcoes then onPedirOpcoes(btn, card, wrapper, onJogarCarta) end
         else
             eMinhaVez = false
-            if onJogarCarta then onJogarCarta(valor, naipe, false) end
+            if onJogarCarta then onJogarCarta(card.idUnico, false) end
             wrapper:Destroy()
             if onOcultarOpcoes then onOcultarOpcoes() end
         end

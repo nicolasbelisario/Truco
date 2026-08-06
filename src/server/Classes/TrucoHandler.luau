@@ -24,6 +24,19 @@ function TrucoHandler:Resetar()
         ValorAtual = 1, ValorPendente = 0, EquipePediu = nil,
         AguardandoResposta = false, IDDesafio = 0, Votos = {}
     }
+    self.TrucoAtivo = true -- Permite Truco por padrão
+end
+
+--[[
+    Ativa ou desativa a possibilidade de pedir Truco na rodada.
+    Usado para Mão de Onze e Mão de Ferro.
+    @param ativo boolean: Se o truco deve estar ativo (true) ou não (false).
+]]
+function TrucoHandler:SetTrucoAtivo(ativo)
+    self.TrucoAtivo = ativo
+    if not ativo then
+        EventBroadcaster.ParaTodos(self.Ctx.Assentos, "HIDE_TRUCO_BTN", 0, self.Ctx.VerificarBot)
+    end
 end
 
 --[[
@@ -32,6 +45,8 @@ end
     @param jogador Player/Bot: O jogador que está pedindo Truco.
 ]]
 function TrucoHandler:ProcessarRequest(jogador)
+    if not self.TrucoAtivo then return end -- Mão de Onze/Ferro não tem truco
+
     local ctx = self.Ctx
     local minha = ctx:ObterEquipe(jogador)
     if self.Estado.AguardandoResposta or self.Estado.EquipePediu == minha then return end

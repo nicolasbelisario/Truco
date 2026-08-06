@@ -41,8 +41,9 @@ function Bot:JogarTurno(numeroQueda, vira, cartasNaMesa, valorMao, valorTruco)
         end
         
         -- 2. Escolher a Carta
+        -- Apenas seleciona a carta, NÃO a remove. A remoção é responsabilidade do RoundManager.
         local indexAleatorio = math.random(1, #self.Mao)
-        local cartaEscolhida = table.remove(self.Mao, indexAleatorio)
+        local cartaEscolhida = self.Mao[indexAleatorio]
         
         -- 3. Decidir se joga Coberta (Escondida)
         local esconderCarta = false
@@ -51,7 +52,7 @@ function Bot:JogarTurno(numeroQueda, vira, cartasNaMesa, valorMao, valorTruco)
         end
         
         -- Joga a carta na mesa
-        self.Partida:JogadorJogarCarta(self, cartaEscolhida.Value, cartaEscolhida.Suit, esconderCarta)
+        self.Partida:JogadorJogarCarta(self, cartaEscolhida.idUnico, esconderCarta)
     end)
 end
 
@@ -63,6 +64,28 @@ function Bot:DecidirTruco(valorProposto, valorAtual)
         self.Partida:ProcessarAcaoTruco(self, "Response", "Aceitar")
     else
         self.Partida:ProcessarAcaoTruco(self, "Response", "Correr")
+    end
+end
+
+-- [MÉTODO] Decide se joga ou corre na Mão de Onze
+function Bot:DecidirMaoDeOnze(maoParceiro)
+    local todasAsCartas = {}
+    for _, c in ipairs(self.Mao) do table.insert(todasAsCartas, c) end
+    for _, c in ipairs(maoParceiro) do table.insert(todasAsCartas, c) end
+
+    local temManilhaForte = false
+    for _, carta in ipairs(todasAsCartas) do
+        -- ManilhaStrength: 4 = Paus (Zap), 3 = Copas
+        if carta.ManilhaStrength and carta.ManilhaStrength >= 3 then
+            temManilhaForte = true
+            break
+        end
+    end
+    
+    if temManilhaForte then
+        self.Partida:JogadorDecidirMaoDeOnze(self, "JOGAR")
+    else
+        self.Partida:JogadorDecidirMaoDeOnze(self, "CORRER")
     end
 end
 

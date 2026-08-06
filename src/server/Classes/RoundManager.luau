@@ -59,7 +59,6 @@ function RoundManager:IniciarNovaRodada()
     EventBroadcaster.ParaTodos(ctx.Assentos, "CUTTING", 0, ctx.VerificarBot) 
     
     local papeis = self:ObterPapeis()
-    -- CORREÇÃO: Usando ":" no lugar de "."
     local jogadorCorte = ctx:ObterJogadorPorCadeira(papeis.Corte)
     
     if ctx:EBot(jogadorCorte) then 
@@ -100,21 +99,21 @@ function RoundManager:DistribuirCartas()
     ctx.Estado = "DEALING"
     EventBroadcaster.ParaTodos(ctx.Assentos, "DEALING", 0, ctx.VerificarBot)
     
+    -- Pega a vira e DEFINE AS MANILHAS para o resto do baralho
     self.ViraAtual = table.remove(self.BaralhoAtual, 1)
-    
+    GerenciadorBaralho.DefinirManilhas(self.BaralhoAtual, self.ViraAtual)
+
     for i = 1, 4 do
         local nomeAssento = "Cadeira"..i
         local jogador = ctx.Assentos[nomeAssento]
-        local mao = {table.remove(self.BaralhoAtual,1), table.remove(self.BaralhoAtual,1), table.remove(self.BaralhoAtual,1)}
+        
+        -- Distribui as 3 cartas completas para a mão do jogador
+        local mao = {table.remove(self.BaralhoAtual, 1), table.remove(self.BaralhoAtual, 1), table.remove(self.BaralhoAtual, 1)}
+        self.MaosJogadores[jogador] = mao -- Armazena os objetos de carta completos
+
         local parceiro = ctx:ObterParceiro(jogador)
         local nomeParceiro = ctx:EBot(parceiro) and parceiro.Nome or (parceiro and parceiro.Name or "...")
         
-        self.MaosJogadores[jogador] = {
-            {Value = mao[1].Value, Suit = mao[1].Suit},
-            {Value = mao[2].Value, Suit = mao[2].Suit},
-            {Value = mao[3].Value, Suit = mao[3].Suit}
-        }
-
         if ctx:EBot(jogador) then 
             jogador:ReceberMao(mao, self.ViraAtual)
         elseif jogador then 
@@ -153,42 +152,49 @@ end
     Verifica se a carta está realmente na mão do jogador (Anti-Cheat).
     Se for a 4ª carta da mesa, aciona a avaliação de quem venceu a queda.
     @param jogador Player/Bot: O jogador que está jogando a carta.
-    @param valor string: O valor da carta.
-    @param naipe string: O naipe da carta.
+    @param cardId string: O ID único da carta jogada (ex: "Q_Copas").
     @param escondida boolean: Se o jogador decidiu jogar a carta virada para baixo.
     @param skinUsada string: A skin cosmética equipada pelo jogador.
 ]]
-function RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
+function RoundManager:JogarCarta(jogador, cardId, escondida, skinUsada)
     local ctx = self.Ctx
     if ctx.TrucoHandler.Estado.AguardandoResposta or ctx.Estado ~= "PLAYING" then return end
     
     local jogadorVez = ctx.Assentos["Cadeira"..self.IndexTurnoAtual]
     if jogadorVez ~= jogador then return end 
 
-    local cartaAutorizada = false
+    local cartaJogada = nil
     local maoServidor = self.MaosJogadores[jogador]
     if maoServidor then
         for i, c in ipairs(maoServidor) do
-            if c.Value == valor and c.Suit == naipe then
-                cartaAutorizada = true
-                table.remove(maoServidor, i)
+            if c.idUnico == cardId then
+                cartaJogada = table.remove(maoServidor, i)
                 break
             end
         end
     end
 
-    if not cartaAutorizada then
-        warn("ANTICHEAT: O jogador " .. (jogador.Name or "Bot") .. " enviou uma carta inválida: " .. valor .. " de " .. naipe)
+    if not cartaJogada then
+        warn("ANTICHEAT: O jogador " .. (jogador.Name or "Bot") .. " enviou uma carta inválida: " .. cardId)
         return
     end
 
     local numRodada = #self.HistoricoQuedas + 1
     if numRodada == 1 then escondida = false end 
-
-    table.insert(self.CartasNaMesa, { Player = jogador, Value = valor, Suit = naipe, IsHidden = escondida, Skin = skinUsada })
+    
+    -- Insere o objeto da carta completo na mesa, com informações adicionais
+    table.insert(self.CartasNaMesa, {
+        Player = jogador, 
+        Value = cartaJogada.Value, 
+        Suit = cartaJogada.Suit,
+        Strength = cartaJogada.Strength,
+        ManilhaStrength = cartaJogada.ManilhaStrength,
+        IsHidden = escondida, 
+        Skin = skinUsada 
+    })
     
     local nomeExibicao = ctx:EBot(jogador) and jogador.Nome or jogador.Name 
-    EventBroadcaster.CartaJogada(ctx:ObterHumanos(), nomeExibicao, valor, naipe, escondida, skinUsada)
+    EventBroadcaster.CartaJogada(ctx:ObterHumanos(), nomeExibicao, cartaJogada.Value, cartaJogada.Suit, escondida, skinUsada)
     
     if #self.CartasNaMesa >= 4 then
         task.wait(1.5)
@@ -206,7 +212,7 @@ end
 ]]
 function RoundManager:AvaliarQueda()
     local ctx = self.Ctx
-    local vencedorObj = GerenciadorRegras.ObterVencedorRodada(self.CartasNaMesa, self.ViraAtual.Value)
+    local vencedorObj = GerenciadorRegras.ObterVencedorRodada(self.CartasNaMesa)
     local equipeVencedora = nil
     
     if vencedorObj == "DRAW" then
@@ -231,18 +237,11 @@ function RoundManager:AvaliarQueda()
     local vencedorMao = nil
     local q1, q2, q3 = self.HistoricoQuedas[1], self.HistoricoQuedas[2], self.HistoricoQuedas[3]
     
-    if q1 == "A" then
-        if q2 == "A" or q2 == "DRAW" then vencedorMao = "A"
-        elseif q2 == "B" then
-            if q3 == "A" or q3 == "DRAW" then vencedorMao = "A"
-            elseif q3 == "B" then vencedorMao = "B" end
-        end
-    elseif q1 == "B" then
-        if q2 == "B" or q2 == "DRAW" then vencedorMao = "B"
-        elseif q2 == "A" then
-            if q3 == "B" or q3 == "DRAW" then vencedorMao = "B"
-            elseif q3 == "A" then vencedorMao = "A" end
-        end
+    -- Lógica para determinar o vencedor da mão (melhor de 3 quedas)
+    if self.QuedasGanhas.TeamA >= 2 then
+        vencedorMao = "A"
+    elseif self.QuedasGanhas.TeamB >= 2 then
+        vencedorMao = "B"
     elseif q1 == "DRAW" then
         if q2 == "A" then vencedorMao = "A"
         elseif q2 == "B" then vencedorMao = "B"
@@ -251,7 +250,11 @@ function RoundManager:AvaliarQueda()
             elseif q3 == "B" then vencedorMao = "B"
             elseif q3 == "DRAW" then vencedorMao = "DRAW" end
         end
-    end
+    elseif (q1 == "A" and q2 == "B" and q3 == "A") or (q1=="A" and q2=="DRAW" and (q3=="A" or q3=="DRAW")) then
+        vencedorMao = "A"
+    elseif (q1 == "B" and q2 == "A" and q3 == "B") or (q1=="B" and q2=="DRAW" and (q3=="B" or q3=="DRAW")) then
+		vencedorMao = "B"
+	end
     
     if vencedorMao then 
         ctx:FinalizarMao(vencedorMao, self.ValorRodada)
@@ -286,6 +289,150 @@ function RoundManager:DefinirVezParaJogador(jogador)
             break 
         end 
     end
+end
+
+-------------------------------------------------------------------
+-- MÃO DE ONZE / MÃO DE FERRO
+-------------------------------------------------------------------
+
+--[[
+    Inicia a rodada especial de Mão de Onze.
+    A rodada vale 3 pontos e a equipe com 11 pontos deve decidir se joga ou corre.
+    @param equipeOnze string: A equipe que está com 11 pontos ("A" ou "B").
+]]
+function RoundManager:IniciarMaoDeOnze(equipeOnze)
+    local ctx = self.Ctx
+    self:limparParaNovaRodada(3) -- Limpa o estado e já define que a mão vale 3
+    ctx.TrucoHandler:SetTrucoAtivo(false) -- Desativa Truco na Mão de Onze
+
+    -- Prepara o baralho e distribui as cartas para o estado interno
+    self:prepararBaralhoEDistribuirInternamente()
+
+    ctx.Estado = "ELEVEN_DECISION"
+    
+    -- Monta a lista de jogadores da equipe que vai decidir
+    local equipeDecisao = {}
+    for _, p in pairs(ctx.Assentos) do
+        if ctx:ObterEquipe(p) == equipeOnze then
+            table.insert(equipeDecisao, p)
+        end
+    end
+
+    -- Envia para a equipe a notificação para decidir, incluindo as cartas do parceiro
+    for _, jogador in ipairs(equipeDecisao) do
+        local parceiro = ctx:ObterParceiro(jogador)
+        local maoParceiro = self.MaosJogadores[parceiro]
+        
+        if ctx:EBot(jogador) then
+            -- Lógica para o Bot decidir
+            task.delay(2, function()
+                jogador:DecidirMaoDeOnze(maoParceiro)
+            end)
+        else
+            EventBroadcaster.ParaJogador(jogador, "SHOW_ELEVEN_DECISION", maoParceiro, ctx.VerificarBot)
+        end
+    end
+end
+
+--[[
+    Processa a decisão de jogar ou correr da Mão de Onze.
+    @param jogador Player/Bot: O jogador que fez a decisão.
+    @param decisao string: "JOGAR" ou "CORRER".
+]]
+function RoundManager:DecidirMaoDeOnze(jogador, decisao)
+    local ctx = self.Ctx
+    if ctx.Estado ~= "ELEVEN_DECISION" then return end
+
+    local equipeJogador = ctx:ObterEquipe(jogador)
+    local equipeOponente = (equipeJogador == "A") and "B" or "A"
+
+    if decisao == "CORRER" then
+        -- A equipe correu, oponente ganha 1 ponto.
+        ctx:FinalizarMao(equipeOponente, 1)
+    elseif decisao == "JOGAR" then
+        -- A equipe aceitou jogar, a rodada começa valendo 3 pontos.
+        self:iniciarTurnosPosDistribuicao()
+    end
+    EventBroadcaster.ParaTodos(ctx.Assentos, "HIDE_ELEVEN_DECISION", nil, ctx.VerificarBot)
+end
+
+--[[
+    Inicia a Mão de Ferro (ambas as equipes com 11 pontos).
+    A rodada é jogada no escuro e vale 3 pontos. Truco é desativado.
+]]
+function RoundManager:IniciarMaoDeFerro()
+    local ctx = self.Ctx
+    self:limparParaNovaRodada(3) -- Limpa o estado e já define que a mão vale 3
+    ctx.TrucoHandler:SetTrucoAtivo(false) -- Desativa Truco na Mão de Ferro
+
+    self:prepararBaralhoEDistribuirInternamente()
+    self:iniciarTurnosPosDistribuicao()
+end
+
+
+-------------------------------------------------------------------
+-- FUNÇÕES AUXILIARES REATORADAS
+-------------------------------------------------------------------
+
+-- Função auxiliar para limpar o estado para uma nova rodada
+function RoundManager:limparParaNovaRodada(valor)
+    self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
+    self.HistoricoQuedas = {}
+    self.CartasNaMesa = {}
+    self.ValorRodada = valor or 1
+    self.MaosJogadores = {}
+    
+    self.Ctx.TrucoHandler:Resetar()
+    EventBroadcaster.ParaTodos(self.Ctx.Assentos, "UPDATE_ROUND_VALUE", self.ValorRodada, self.Ctx.VerificarBot)
+end
+
+-- Função auxiliar para preparar e distribuir as cartas internamente
+function RoundManager:prepararBaralhoEDistribuirInternamente()
+    local ctx = self.Ctx
+    self.BaralhoAtual = GerenciadorBaralho.CriarBaralho() 
+    GerenciadorBaralho.Embaralhar(self.BaralhoAtual)
+    
+    -- Simula o corte para remover cartas se necessário, mas sem interação
+    GerenciadorBaralho.Cortar(self.BaralhoAtual, 1)
+    
+    ctx.Estado = "DEALING"
+    EventBroadcaster.ParaTodos(ctx.Assentos, "DEALING", 0, ctx.VerificarBot)
+    
+    self.ViraAtual = table.remove(self.BaralhoAtual, 1)
+    GerenciadorBaralho.DefinirManilhas(self.BaralhoAtual, self.ViraAtual)
+    
+    for i = 1, 4 do
+        local nomeAssento = "Cadeira"..i
+        local jogador = ctx.Assentos[nomeAssento]
+        local mao = {table.remove(self.BaralhoAtual, 1), table.remove(self.BaralhoAtual, 1), table.remove(self.BaralhoAtual, 1)}
+        self.MaosJogadores[jogador] = mao
+    end
+end
+
+-- Função auxiliar para notificar clientes e iniciar os turnos
+function RoundManager:iniciarTurnosPosDistribuicao()
+    local ctx = self.Ctx
+    
+    -- Notifica cada jogador de suas cartas
+    for i = 1, 4 do
+        local nomeAssento = "Cadeira"..i
+        local jogador = ctx.Assentos[nomeAssento]
+        local mao = self.MaosJogadores[jogador]
+        local parceiro = ctx:ObterParceiro(jogador)
+        local nomeParceiro = ctx:EBot(parceiro) and parceiro.Nome or (parceiro and parceiro.Name or "...")
+        
+        if ctx:EBot(jogador) then 
+            jogador:ReceberMao(mao, self.ViraAtual)
+        elseif jogador then 
+            EventBroadcaster.DistribuirCartas(jogador, mao, self.ViraAtual, nomeParceiro)
+        end
+    end
+    
+    task.wait(1)
+    ctx.Estado = "PLAYING"
+    local papeis = self:ObterPapeis()
+    self.IndexTurnoAtual = tonumber(papeis.Mao:match("%d+"))
+    self:AvancarTurno()
 end
 
 return RoundManager

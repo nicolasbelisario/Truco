@@ -47,8 +47,8 @@ function UIManager.Inicializar()
     TableUI.Inicializar(painelTela)
     
     HandUI.Inicializar(painelTela, {
-        onJogarCarta = function(v, n, e) Eventos.PlayCardEvent:FireServer(v, n, e) end,
-        onPedirOpcoes = function(btn, v, n, c, cbJogar) UIManager.MostrarOpcoesJogada(btn, v, n, c, cbJogar) end,
+        onJogarCarta = function(cardId, escondida) Eventos.PlayCardEvent:FireServer(cardId, escondida) end,
+        onPedirOpcoes = function(btn, card, container, cbJogar) UIManager.MostrarOpcoesJogada(btn, card, container, cbJogar) end,
         onOcultarOpcoes = function() UIManager.OcultarOpcoesJogada() end
     })
     
@@ -69,7 +69,7 @@ end
 -- OPÇÕES DE JOGADA (MENU ABERTA/COBERTA)
 -- ==========================================
 
-function UIManager.MostrarOpcoesJogada(botaoCarta, valor, naipe, container, onJogarCartaCallback)
+function UIManager.MostrarOpcoesJogada(botaoCarta, card, container, onJogarCartaCallback)
     if painelOpcoesJogada then painelOpcoesJogada:Destroy() end
     
     local larguraMenu = 160
@@ -121,7 +121,7 @@ function UIManager.MostrarOpcoesJogada(botaoCarta, valor, naipe, container, onJo
         btn.Activated:Connect(function()
             eMinhaVez = false
             HandUI.DefinirEstado(eMinhaVez, nil, nil, nil)
-            if onJogarCartaCallback then onJogarCartaCallback(valor, naipe, escondida) end
+            if onJogarCartaCallback then onJogarCartaCallback(card.idUnico, escondida) end
             container:Destroy()
             painelOpcoesJogada:Destroy()
         end)
@@ -150,7 +150,7 @@ end
 
 function UIManager.AtualizarEstatisticasRodada(p, n, e) ScoreUI.AtualizarEstatisticas(p, n, e, estaSentado) end
 function UIManager.LimparMao()                     HandUI.Limpar(); UIManager.OcultarOpcoesJogada() end
-function UIManager.AdicionarCartaMao(v, n)         HandUI.AdicionarCarta(v, n) end
+function UIManager.AdicionarCartaMao(card)         HandUI.AdicionarCarta(card) end
 function UIManager.AdicionarCartaJogadaUI(...)     TableUI.AdicionarCarta(...) end
 function UIManager.LimparMesa()                    TableUI.Limpar() end
 function UIManager.TocarSom(nome)                  SoundManager.Tocar(nome) end

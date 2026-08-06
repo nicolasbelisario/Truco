@@ -7,16 +7,53 @@ local GerenciadorBaralho = {}
 -- [MÉTODO] Cria e RETORNA um novo baralho com todas as cartas válidas
 function GerenciadorBaralho.CriarBaralho()
     local baralho = {}
-    for _, naipe in ipairs(ConfiguracoesCartas.Suits) do
-        for _, valor in ipairs(ConfiguracoesCartas.Values) do
+    local forcaAbsoluta = 1
+    for _, valor in ipairs(ConfiguracoesCartas.Values) do
+        for _, naipe in ipairs(ConfiguracoesCartas.Suits) do
             table.insert(baralho, {
+                idUnico = valor .. "_" .. naipe,
                 Value = valor,
-                Suit = naipe
+                Suit = naipe,
+                Strength = forcaAbsoluta, -- Força base da carta
+                ManilhaStrength = 0 -- Força como manilha (0 se não for manilha)
             })
         end
+        forcaAbsoluta = forcaAbsoluta + 1
     end
     return baralho
 end
+
+-- [MÉTODO] Define as manilhas da rodada baseado na vira
+function GerenciadorBaralho.DefinirManilhas(baralho, vira)
+    if not baralho or not vira then return end
+
+    local proximoValor
+    local viraIndex = table.find(ConfiguracoesCartas.Values, vira.Value)
+    
+    if viraIndex and viraIndex < #ConfiguracoesCartas.Values then
+        proximoValor = ConfiguracoesCartas.Values[viraIndex + 1]
+    else
+        -- Se a vira for a carta mais forte (3), a manilha é a mais fraca (4)
+        proximoValor = ConfiguracoesCartas.Values[1] 
+    end
+
+    -- Ordem de força das manilhas por naipe
+    local forcaManilhaPorNaipe = {
+        ["Paus"] = 4,    -- Zap
+        ["Copas"] = 3,
+        ["Espadas"] = 2,
+        ["Ouros"] = 1    -- Pica-fumo
+    }
+
+    for _, carta in ipairs(baralho) do
+        if carta.Value == proximoValor then
+            carta.ManilhaStrength = forcaManilhaPorNaipe[carta.Suit]
+        else
+            carta.ManilhaStrength = 0 -- Garante que apenas as manilhas certas tenham força
+        end
+    end
+end
+
 
 -- [MÉTODO] Recebe a tabela do baralho atual e bagunça a ordem (Embaralha)
 function GerenciadorBaralho.Embaralhar(baralho)

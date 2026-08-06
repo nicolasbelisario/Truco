@@ -190,7 +190,7 @@ Eventos.DealCards.OnClientEvent:Connect(function(mao, vira, nomeParceiro)
     GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, 0, 0)
     
     for _, carta in ipairs(mao) do
-        GerenciadorUI.AdicionarCartaMao(carta.Value, carta.Suit)
+        GerenciadorUI.AdicionarCartaMao(carta)
     end
 end)
 

@@ -38,9 +38,9 @@ end
 -- [MÉTODO] Recebe as ações dos clientes e redireciona para a mesa correta
 function GerenciadorMesas.ConfigurarRede()
     
-    Eventos.PlayCardEvent.OnServerEvent:Connect(function(jogador, valor, naipe, escondida)
+    Eventos.PlayCardEvent.OnServerEvent:Connect(function(jogador, cardId, escondida)
         local partida = jogadorParaMesa[jogador]
-        if partida then partida:JogadorJogarCarta(jogador, valor, naipe, escondida) end
+        if partida then partida:JogadorJogarCarta(jogador, cardId, escondida) end
     end)
 
     Eventos.TrucoEvent.OnServerEvent:Connect(function(jogador, acao, subAcao)
@@ -50,8 +50,12 @@ function GerenciadorMesas.ConfigurarRede()
     
     Eventos.GameStatusEvent.OnServerEvent:Connect(function(jogador, acao, valor)
         local partida = jogadorParaMesa[jogador]
-        if partida and acao == "CutAction" then
-            partida:JogadorCortarBaralho(jogador, valor)
+        if partida then
+            if acao == "CutAction" then
+                partida:JogadorCortarBaralho(jogador, valor)
+            elseif acao == "HandOfElevenDecision" then
+                partida:JogadorDecidirMaoDeOnze(jogador, valor)
+            end
         end
     end)
     

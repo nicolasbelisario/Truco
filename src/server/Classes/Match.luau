@@ -4,6 +4,7 @@ local TrucoHandler = require(script.Parent:WaitForChild("TrucoHandler"))
 local RoundManager = require(script.Parent:WaitForChild("RoundManager"))
 local Bot = require(script.Parent:WaitForChild("Bot"))
 local DataManager = require(script.Parent.Parent:WaitForChild("DataManager"))
+local AvatarManager = require(script.Parent.Parent.Utils:WaitForChild("AvatarManager"))
 
 local BotDummyTemplate = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BotDummy")
 
@@ -159,7 +160,79 @@ function Partida:ComecarJogo()
     self:DefinirPuloJogadores(false)
     self.Placar = {TeamA = 0, TeamB = 0}
     self.RoundManager.IndexDistribuidor = math.random(1, 4)
-    self.RoundManager:IniciarNovaRodada()
+    
+    -- Aplica as skins dos amigos nos bots de forma assíncrona
+    task.spawn(function() self:DefinirSkinsDosBots() end)
+    
+    self:VerificarProximaRodada()
+end
+
+--[[
+    Busca e aplica skins de amigos dos jogadores humanos aos bots da partida.
+    A lógica varia conforme a quantidade de jogadores.
+]]
+function Partida:DefinirSkinsDosBots()
+    local humanos = self:ObterHumanos()
+    local bots = {}
+    for _, p in pairs(self.Assentos) do if self:EBot(p) then table.insert(bots, p) end end
+    if #bots == 0 or #humanos == 0 then return end
+
+    local avatares = {}
+    local amigosUsados = {}
+    
+    if #humanos == 1 then
+        avatares, amigosUsados = AvatarManager.GetRandomFriendAvatars(humanos, 3)
+    elseif #humanos == 2 then
+        for _, bot in ipairs(bots) do
+            local parceiroHumano = self:ObterParceiro(bot)
+            if parceiroHumano and not self:EBot(parceiroHumano) then
+                local avatarAmigo, novosUsados = AvatarManager.GetRandomFriendAvatars({parceiroHumano}, 1, amigosUsados)
+                if #avatarAmigo > 0 then 
+                    table.insert(avatares, avatarAmigo[1])
+                    amigosUsados = novosUsados
+                end
+            end
+        end
+    elseif #humanos == 3 then
+        local jogadorAleatorio = {humanos[math.random(1, #humanos)]}
+        avatares, amigosUsados = AvatarManager.GetRandomFriendAvatars(jogadorAleatorio, 1)
+    end
+    
+    if #avatares > 0 then
+        for i, bot in ipairs(bots) do
+            if avatares[i] then
+                local assentoBot = self.Modelo:FindFirstChild("Cadeiras"):FindFirstChild(bot.NomeAssento)
+                if assentoBot then
+                    local botVisual = assentoBot:FindFirstChild(bot.Nome)
+                    if botVisual and botVisual:FindFirstChild("Humanoid") then
+                        pcall(function()
+                            botVisual.Humanoid:ApplyDescription(avatares[i])
+                        end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+--[[
+    Verifica o placar e decide se a próxima rodada é normal ou uma Mão de Onze.
+]]
+function Partida:VerificarProximaRodada()
+    local scoreA = self.Placar.TeamA
+    local scoreB = self.Placar.TeamB
+
+    -- Condição de Mão de Onze
+    if (scoreA == 11 and scoreB < 11) or (scoreB == 11 and scoreA < 11) then
+        local equipeOnze = (scoreA == 11) and "A" or "B"
+        self.RoundManager:IniciarMaoDeOnze(equipeOnze)
+    -- Condição de Mão de Ferro (ambos com 11)
+    elseif scoreA == 11 and scoreB == 11 then
+        self.RoundManager:IniciarMaoDeFerro()
+    else
+        self.RoundManager:IniciarNovaRodada()
+    end
 end
 
 --[[
@@ -176,18 +249,37 @@ function Partida:ResetarPartida(motivo)
     self.Placar = {TeamA=0, TeamB=0}
     self.RoundManager:ResetarEstado()
     self.TrucoHandler:Resetar()
+    
+    -- Reseta a aparência dos bots para a padrão
+    for _, bot in pairs(self.Assentos) do
+        if self:EBot(bot) then
+            local assentoBot = self.Modelo:FindFirstChild("Cadeiras"):FindFirstChild(bot.NomeAssento)
+            if assentoBot then
+                local botVisual = assentoBot:FindFirstChild(bot.Nome)
+                if botVisual then
+                    local templateLimpo = BotDummyTemplate:Clone()
+                    local humanoidLimpo = templateLimpo:FindFirstChild("Humanoid")
+                    if humanoidLimpo then
+                        pcall(function()
+                            botVisual.Humanoid:ApplyDescription(humanoidLimpo:GetAppliedDescription())
+                        end)
+                    end
+                    templateLimpo:Destroy()
+                end
+            end
+        end
+    end
 end
 
 --[[
     Delega a ação de jogar uma carta para o gerenciador da rodada.
     @param jogador Player/Bot: O jogador que enviou a carta.
-    @param valor string: O valor da carta.
-    @param naipe string: O naipe da carta.
+    @param cardId string: O ID único da carta.
     @param escondida boolean: Se a carta deve ser jogada coberta.
 ]]
-function Partida:JogadorJogarCarta(jogador, valor, naipe, escondida)
+function Partida:JogadorJogarCarta(jogador, cardId, escondida)
     local skinUsada = self:EBot(jogador) and "Padrao" or DataManager.ObterSkinEquipada(jogador)
-    self.RoundManager:JogarCarta(jogador, valor, naipe, escondida, skinUsada)
+    self.RoundManager:JogarCarta(jogador, cardId, escondida, skinUsada)
 end
 
 --[[
@@ -203,6 +295,15 @@ function Partida:ProcessarAcaoTruco(jogador, acao, subAcao)
     elseif acao == "Response" then
         self.TrucoHandler:ProcessarResponse(jogador, subAcao)
     end
+end
+
+--[[
+    Delega a decisão da Mão de Onze para o RoundManager.
+    @param jogador Player: O jogador que tomou a decisão.
+    @param decisao string: "JOGAR" ou "CORRER".
+]]
+function Partida:JogadorDecidirMaoDeOnze(jogador, decisao)
+    self.RoundManager:DecidirMaoDeOnze(jogador, decisao)
 end
 
 --[[
@@ -269,7 +370,7 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
         self:ResetarPartida("Nova Partida")
     else
         self.RoundManager.IndexDistribuidor = (self.RoundManager.IndexDistribuidor % 4) + 1
-        self.RoundManager:IniciarNovaRodada()
+        self:VerificarProximaRodada()
     end
 end
 
