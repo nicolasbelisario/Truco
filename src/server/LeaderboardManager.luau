@@ -135,41 +135,7 @@ local function carregarTopRanking(ods, categoria)
     cacheRanking[categoria] = lista
 end
 
--- Migra dados existentes de jogadores do TrucoData_v1 para os OrderedDataStores
-local function migrarDadosExistentes()
-    local ok, pages = pcall(function()
-        return TrucoDataStore:ListKeysAsync()
-    end)
-    
-    if ok and pages then
-        print("[LeaderboardManager] Sincronizando dados históricos com OrderedDataStore...")
-        while true do
-            local keys = pages:GetCurrentPage()
-            for _, keyObj in ipairs(keys) do
-                local keyName = tostring(keyObj.KeyName)
-                local numUserId = tonumber(keyName)
-                if numUserId then
-                    local okDados, dados = pcall(function()
-                        return TrucoDataStore:GetAsync(numUserId)
-                    end)
-                    if okDados and type(dados) == "table" then
-                        LeaderboardManager.SalvarEntradaODS(keyName, {
-                            Vitorias = dados.Vitorias or 0,
-                            Pontos = dados.Pontos or 0,
-                            RobuxGasto = dados.RobuxGasto or 0
-                        })
-                    end
-                    task.wait(0.2)
-                end
-            end
-            if pages.IsFinished then break end
-            local okNext = pcall(function() pages:AdvanceToNextPageAsync() end)
-            if not okNext then break end
-        end
-        print("[LeaderboardManager] Sincronização histórica concluída.")
-        LeaderboardManager.AtualizarTodosRankings()
-    end
-end
+
 
 function LeaderboardManager.AtualizarTodosRankings()
     carregarTopRanking(ODS_Vitorias, "Vitorias")
@@ -433,9 +399,6 @@ function LeaderboardManager.Inicializar()
     task.spawn(function()
         task.wait(1)
         LeaderboardManager.AtualizarTodosRankings()
-        -- Inicia migração de jogadores existentes no banco em background
-        task.wait(3)
-        migrarDadosExistentes()
     end)
 
     -- Loop de persistência periódica de ODS
