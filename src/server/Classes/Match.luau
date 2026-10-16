@@ -363,9 +363,11 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
             if not self:EBot(jog) then
                 if self:ObterEquipe(jog) == equipeCampeao then
                     DataManager.AdicionarPontos(jog, ptsVitoria)
+                    DataManager.RegistrarResultadoPartida(jog, true)
                     EventBroadcaster.ParaJogador(jog, "UPDATE_STATUS", "Você ganhou +" .. ptsVitoria .. " Pontos!", self.VerificarBot)
                 else
                     DataManager.AdicionarPontos(jog, ptsDerrota)
+                    DataManager.RegistrarResultadoPartida(jog, false)
                     EventBroadcaster.ParaJogador(jog, "UPDATE_STATUS", "Você ganhou +" .. ptsDerrota .. " Pontos de consolação.", self.VerificarBot)
                 end
             end

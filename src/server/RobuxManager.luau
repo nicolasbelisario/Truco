@@ -14,14 +14,18 @@ MarketplaceService.ProcessReceipt = function(info)
     local jogador = Players:GetPlayerByUserId(info.PlayerId)
     if not jogador then return Enum.ProductPurchaseDecision.NotProcessedYet end
 
+    local precoRobux = (EconomyConfig.ProdutosPrecoRobuxMap and EconomyConfig.ProdutosPrecoRobuxMap[info.ProductId]) or (info.CurrencySpent or 0)
+    
     local pts = PRODUTOS_PONTOS[info.ProductId]
     if pts then
         DataManager.AdicionarPontos(jogador, pts)
+        DataManager.RegistrarGastoRobux(jogador, precoRobux)
         return Enum.ProductPurchaseDecision.PurchaseGranted
     end
 
     if DOACOES[info.ProductId] then
-        print("Doação recebida de " .. jogador.Name)
+        print("Doação recebida de " .. jogador.Name .. " (" .. precoRobux .. " Robux)")
+        DataManager.RegistrarGastoRobux(jogador, precoRobux)
         return Enum.ProductPurchaseDecision.PurchaseGranted
     end
 

@@ -16,7 +16,8 @@
         "SignalEvent": { "$className": "RemoteEvent" },
         "SyncDataEvent": { "$className": "RemoteEvent" },
         "ShopActionEvent": { "$className": "RemoteEvent" },
-        "AdminActionEvent": { "$className": "RemoteEvent" }
+        "AdminActionEvent": { "$className": "RemoteEvent" },
+        "GetLeaderboardData": { "$className": "RemoteFunction" }
       },
       "Shared": {
         "$path": "src/shared"

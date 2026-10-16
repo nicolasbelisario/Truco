@@ -99,6 +99,7 @@ EconomyConfig.PrecosSkins = tabelaPrecos
 -- Mapeamento rápido de Id de Produto para Pontos Concedidos
 local tabelaProdutosPontos = {}
 local tabelaDoacoes = {}
+local tabelaPrecoRobux = {}
 for _, prod in ipairs(EconomyConfig.ProdutosRobux) do
     if prod.PontosConcedidos > 0 then
         tabelaProdutosPontos[prod.IdProduto] = prod.PontosConcedidos
@@ -106,8 +107,10 @@ for _, prod in ipairs(EconomyConfig.ProdutosRobux) do
     if prod.EhDoacao then
         tabelaDoacoes[prod.IdProduto] = true
     end
+    tabelaPrecoRobux[prod.IdProduto] = tonumber(prod.PrecoRobux) or 0
 end
 EconomyConfig.ProdutosPontosMap = tabelaProdutosPontos
 EconomyConfig.DoacoesMap = tabelaDoacoes
+EconomyConfig.ProdutosPrecoRobuxMap = tabelaPrecoRobux
 
 return EconomyConfig

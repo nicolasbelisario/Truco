@@ -87,6 +87,7 @@ flowchart TD
 | `DataManager.luau` | Persistência via DataStore: carrega/salva pontos, skins por `UserId` |
 | `ShopManager.luau` | Processa compras e equipamentos de skins (via `ShopActionEvent`) |
 | `RobuxManager.luau` | Processa compras com Robux via `MarketplaceService` |
+| `LeaderboardManager.luau` | Ranking global via OrderedDataStore (Vitórias, Pontos, Robux) e quadro físico 3D no mapa |
 | `AdminManager.luau` | Comandos de administrador |
 | **`Match.luau`** | Orquestra uma partida completa: assentos, placar, estados, callbacks |
 | **`RoundManager.luau`** | Gerencia cada Mão: baralho, distribuição, turnos, quedas, avaliação |
@@ -103,6 +104,7 @@ flowchart TD
 |---------|-----------------|
 | `init.client.luau` | Entry point do cliente: instancia e conecta todos os módulos de UI |
 | `UIManager.luau` | Gerencia todas as UIs: qual mostrar, qual esconder por evento de estado |
+| `LeaderboardUI.luau` | Botão TopBar circular escuro e Modal de Ranking global (Vitórias, Pontos, Apoiadores) |
 | `HandUI.luau` | Renderiza as cartas na mão do jogador, clique para jogar |
 | `TrucoUI.luau` | Botões e animações de Truco (pedir, aceitar, correr, aumentar) |
 | `ScoreUI.luau` | Placar da partida e pontuação de quedas |

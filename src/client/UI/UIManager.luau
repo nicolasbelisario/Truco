@@ -14,6 +14,7 @@ local TutorialUI  = require(script.Parent.TutorialUI)
 local ScoreUI     = require(script.Parent.ScoreUI)
 local SoundManager = require(script.Parent.SoundManager)
 local CameraManager = require(script.Parent.CameraManager)
+local LeaderboardUI = require(script.Parent.LeaderboardUI)
 
 local Eventos = ReplicatedStorage:WaitForChild("Events")
 local jogadorLocal = game:GetService("Players").LocalPlayer
@@ -55,6 +56,8 @@ function UIManager.Inicializar()
     ScoreUI.Inicializar(UIManager._CriarElementosScore())
     ShopUI.Inicializar(painelTela)
     TutorialUI.Inicializar(painelTela)
+    LeaderboardUI.Inicializar(painelTela)
+    UIManager.LeaderboardUI = LeaderboardUI
     
     -- Inicializado depois das cartas para garantir que o pop-up fique por cima
     TrucoUI.Inicializar(painelTela, CameraManager)
@@ -631,6 +634,7 @@ end
 function UIManager.DefinirSentado(s)
     estaSentado = s
     ShopUI.DefinirVisibilidade(not s)
+    if s then LeaderboardUI.Fechar() end
     if painelEmotes then painelEmotes.Visible = s end
     if not s then UIManager.ResetTotal() end
 end

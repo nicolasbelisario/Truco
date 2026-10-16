@@ -7,10 +7,18 @@
 
 ## [Não Lançado]
 
+### Implementado
+- 🏆 **Sistema de Ranking / Leaderboard Global ([Issue #3](https://github.com/nicolasbelisario/Truco/issues))**:
+  - `LeaderboardManager.luau` com 3 `OrderedDataStore` (Vitórias, Pontos, Apoiadores/Robux).
+  - Atualização do schema em `DataManager.luau` com persistência de `Vitorias`, `Derrotas`, `PartidasJogadas` e `RobuxGasto`.
+  - Quadro físico 3D no mapa (Lobby SurfaceGui) com Top 10 e destaques de pódio.
+  - Botão redondo TopBar escuro padrão do Roblox e Modal de Leaderboard completo com abas e card de desempenho próprio.
+  - Gatilhos automáticos pós-partida em `Match.luau` e pós-compra em `RobuxManager.luau`.
+  - RemoteFunction `GetLeaderboardData` sincronizada via `default.project.json`.
+
 ### Planejado
 - Sistema de IA dos Bots com estratégia real ([Issue #1](https://github.com/nicolasbelisario/Truco/issues))
 - Matchmaking / Sala Pública PvP ([Issue #2](https://github.com/nicolasbelisario/Truco/issues))
-- Ranking / Leaderboard Global ([Issue #3](https://github.com/nicolasbelisario/Truco/issues))
 - Emotes e Chat de Mesa expandido ([Issue #4](https://github.com/nicolasbelisario/Truco/issues))
 - Sistema de Conquistas / Achievements ([Issue #5](https://github.com/nicolasbelisario/Truco/issues))
 - Modo Truco Mineiro / Variantes de Regras ([Issue #6](https://github.com/nicolasbelisario/Truco/issues))
