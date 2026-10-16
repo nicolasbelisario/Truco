@@ -21,9 +21,34 @@
 ### Bug Fixes Planejados
 - Timeout do Corte com condição de corrida ([Issue #7](https://github.com/nicolasbelisario/Truco/issues))
 
+## [Skills & MCP Integration] — 2026-10-16
+
+### Adicionado
+- 🧠 **Skills Modulares com Testes Automatizados**:
+  - `.gemini/skills/truco-core-rules/` + teste unitário desacoplado `test_rules.py`
+  - `.gemini/skills/game-balance-economy/` + validador de integridade e compliance `validate_configs.py`
+  - `.gemini/skills/truco-match-flow/` + teste de escalonamento de Truco `test_match_flow.py`
+  - Espelhamento completo das skills no diretório `skills/` na raiz
+- ⚙️ **Extração de Configurações (Single Source of Truth)** em `src/shared/Configs/`:
+  - `EconomyConfig.luau` (catálogo oficial de skins, produtos Robux, recompensas PvP/PvE)
+  - `BotConfig.luau` (calibração de agressividade, chances de blefe, tempos de reação)
+  - `GameRulesConfig.luau` (limites temporais, valores de mão 1/3/6/9/12, estados de jogo)
+- 📡 **Servidor MCP de Logs em Tempo Real** (`tools/mcp_roblox_logs/server.py`):
+  - Ferramentas `read_roblox_studio_output`, `check_roblox_errors_and_warnings` e `get_roblox_log_session_info`
+  - Configuração registrada em `mcp.json` para feedback contínuo
+
+### Refatorado
+- `ShopUI.luau` — agora consome dados de skins e produtos de Robux dinamicamente de `EconomyConfig`
+- `ShopManager.luau` — valida preços diretamente da tabela unificada `EconomyConfig.PrecosSkins`
+- `RobuxManager.luau` — processa produtos via mapas derivados de `EconomyConfig`
+- `Bot.luau` — lógica de blefe, carta coberta e decisão de Truco desacoplada com parâmetros de `BotConfig`
+- `Match.luau` — recompensas pós-partida e tempos vinculados a `EconomyConfig` e `GameRulesConfig`
+- `TrucoHandler.luau` — timeout de resposta parametrizado em `GameRulesConfig`
+
 ---
 
 ## [SDD Migration] — 2026-10-15
+
 
 ### Adicionado
 - 📄 Documentação SDD completa em `docs/`

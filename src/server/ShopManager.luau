@@ -1,10 +1,11 @@
-local Eventos = game.ReplicatedStorage:WaitForChild("Events")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Eventos = ReplicatedStorage:WaitForChild("Events")
 local DataManager = require(script.Parent.DataManager)
+local EconomyConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("EconomyConfig"))
 
 local ShopManager = {}
+local PRECOS = EconomyConfig.PrecosSkins
 
--- (O) Aberto para adicionar skins sem modificar a lógica de compra
-local PRECOS = { ["Padrao"]=0, ["Rosa"]=200, ["Nacional"]=300, ["Estrela"]=300 }
 
 Eventos.ShopActionEvent.OnServerEvent:Connect(function(jogador, acao, idSkin)
     local dados = DataManager.ObterDados(jogador)

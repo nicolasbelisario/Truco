@@ -1,6 +1,9 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local EventBroadcaster = require(script.Parent.EventBroadcaster)
+local GameRulesConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("GameRulesConfig"))
 
 local TrucoHandler = {}
+
 TrucoHandler.__index = TrucoHandler
 
 --[[
@@ -144,7 +147,8 @@ end
 function TrucoHandler:_PedirResposta(equipeAlvo, valor, quemPediu)
     local ctx = self.Ctx
     local idAtual = self.Estado.IDDesafio
-    local TEMPO = 15
+    local TEMPO = GameRulesConfig.Tempos.LimiteRespostaTruco
+
 
     task.delay(TEMPO, function()
         if self.Estado.AguardandoResposta and self.Estado.IDDesafio == idAtual then

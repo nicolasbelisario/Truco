@@ -4,19 +4,16 @@ local Players = game:GetService("Players")
 local jogadorLocal = Players.LocalPlayer
 local Eventos = ReplicatedStorage:WaitForChild("Events")
 local CardSettings = require(ReplicatedStorage.Shared.CardSettings)
+local EconomyConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("EconomyConfig"))
 
 local ShopUI = {}
 
 local btnLoja, menuLoja, paginaPontos, paginaRobux, textoMeusPontos
 local btnAbaPontos, btnAbaRobux
-local dadosJogador = { Pontos = 0, SkinsCompradas = {"Padrao"}, SkinEquipada = "Padrao" }
+local dadosJogador = { Pontos = 0, SkinsCompradas = {EconomyConfig.SkinPadraoId}, SkinEquipada = EconomyConfig.SkinPadraoId }
 
-local CATALOGO_SKINS = {
-    { Id = "Padrao", Nome = "Baralho Clássico", Preco = 0, Desc = "O bom e velho Truco raiz." },
-    { Id = "Rosa", Nome = "Baralho Rosa", Preco = 200, Desc = "Para quem gosta de um jogo fofinho." },
-    { Id = "Nacional", Nome = "Baralho Nacional", Preco = 300, Desc = "Baralho 100% patriota." },
-    { Id = "Estrela", Nome = "Baralho Estelar", Preco = 300, Desc = "Baralho 100% da Estrela Vermelha." },
-}
+local CATALOGO_SKINS = EconomyConfig.Skins
+
 
 local function renderizarSkins()
     if not paginaPontos then return end
@@ -267,11 +264,11 @@ function ShopUI.Inicializar(pai)
     paginaRobux.AutomaticCanvasSize = Enum.AutomaticSize.Y 
     Instance.new("UIListLayout", paginaRobux).Padding = UDim.new(0, 15)
 
-    -- Itens baseados na sua versão antiga
-    criarItemLoja("100 Pontos", "Impulsione suas compras!", "10", 3554291316, false)
-    criarItemLoja("500 Pontos", "Fique rico rapidamente!", "40", 3554291580, false)
-    criarItemLoja("Doação 1", "Vai me ajudar a desenvolver o jogo :D", "15", 3549774213, false)
-    criarItemLoja("Doação 2", "Vai me ajudar a desenvolver o jogo :D", "30", 3549774425, false)
+    -- Itens carregados dinamicamente da configuração unificada
+    for _, item in ipairs(EconomyConfig.ProdutosRobux) do
+        criarItemLoja(item.Nome, item.Desc, item.PrecoRobux, item.IdProduto, item.EhGamepass)
+    end
+
 
     btnAbaPontos.Activated:Connect(function()
         paginaPontos.Visible = true; paginaRobux.Visible = false

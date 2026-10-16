@@ -1,12 +1,14 @@
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataManager = require(script.Parent.DataManager)
+local EconomyConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("EconomyConfig"))
 
-local RobuxManager = {} -- Criando a tabela do módulo
+local RobuxManager = {}
 
--- (O) Aberto: adicionar novos produtos só nesta tabela
-local PRODUTOS_PONTOS = { [3554291316]=100, [3554291580]=500 }
-local DOACOES         = { [3549774213]=true, [3549774425]=true }
+local PRODUTOS_PONTOS = EconomyConfig.ProdutosPontosMap
+local DOACOES         = EconomyConfig.DoacoesMap
+
 
 MarketplaceService.ProcessReceipt = function(info)
     local jogador = Players:GetPlayerByUserId(info.PlayerId)

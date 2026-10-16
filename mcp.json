@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "roblox-studio-logs": {
+      "command": "python",
+      "args": ["tools/mcp_roblox_logs/server.py"]
+    }
+  }
+}

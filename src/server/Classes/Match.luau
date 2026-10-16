@@ -5,8 +5,11 @@ local RoundManager = require(script.Parent:WaitForChild("RoundManager"))
 local Bot = require(script.Parent:WaitForChild("Bot"))
 local DataManager = require(script.Parent.Parent:WaitForChild("DataManager"))
 local AvatarManager = require(script.Parent.Parent.Utils:WaitForChild("AvatarManager"))
+local EconomyConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("EconomyConfig"))
+local GameRulesConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Configs"):WaitForChild("GameRulesConfig"))
 
 local BotDummyTemplate = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BotDummy")
+
 
 local Partida = {}
 Partida.__index = Partida
@@ -347,12 +350,14 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
     
     task.wait(3)
     
-    if self.Placar.TeamA >= 12 or self.Placar.TeamB >= 12 then
-        local equipeCampeao = (self.Placar.TeamA >= 12) and "A" or "B"
+    local ptsMaximo = GameRulesConfig.PONTOS_VITORIA_PARTIDA
+    if self.Placar.TeamA >= ptsMaximo or self.Placar.TeamB >= ptsMaximo then
+        local equipeCampeao = (self.Placar.TeamA >= ptsMaximo) and "A" or "B"
         EventBroadcaster.ParaTodos(self.Assentos, "MATCH_WON", self:ObterNomesEquipe(equipeCampeao) .. " Venceram!", self.VerificarBot)
         
-        local ptsVitoria = self.UsaBots and 30 or 50
-        local ptsDerrota = self.UsaBots and 10 or 20
+        local configRecompensa = self.UsaBots and EconomyConfig.Recompensas.PvE or EconomyConfig.Recompensas.PvP
+        local ptsVitoria = configRecompensa.Vitoria
+        local ptsDerrota = configRecompensa.Derrota
 
         for _, jog in pairs(self.Assentos) do
             if not self:EBot(jog) then
@@ -366,9 +371,10 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
             end
         end
         
-        task.wait(8)
+        task.wait(GameRulesConfig.Tempos.EsperaFinalizacaoPartida)
         self:ResetarPartida("Nova Partida")
     else
+
         self.RoundManager.IndexDistribuidor = (self.RoundManager.IndexDistribuidor % 4) + 1
         self:VerificarProximaRodada()
     end
