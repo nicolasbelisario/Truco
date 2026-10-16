@@ -41,35 +41,68 @@ local function obterNomeJogador(userId)
     return "Jogador_" .. tostring(userId)
 end
 
+local TrucoDataStore = DataStoreService:GetDataStore("TrucoData_v1")
+
 -- Atualiza o OrderedDataStore com os dados recentes do jogador
 function LeaderboardManager.AtualizarODSJogador(jogador, dados)
     if not jogador or not dados then return end
     local userId = tostring(jogador.UserId)
     
-    -- Marca para persistência sem spammar chamadas
     pendentesSalvar[userId] = {
-        UserId = jogador.UserId,
+        UserId = userId,
         Vitorias = dados.Vitorias or 0,
         Pontos = dados.Pontos or 0,
         RobuxGasto = dados.RobuxGasto or 0
     }
+
+    -- Processa rapidamente para refletir na leaderboard sem demora
+    task.spawn(function()
+        task.wait(0.5)
+        LeaderboardManager.SalvarEntradaODS(userId, pendentesSalvar[userId])
+    end)
+end
+
+-- Salva uma entrada individual no OrderedDataStore
+function LeaderboardManager.SalvarEntradaODS(chave, info)
+    if not info then return end
+    local alterou = false
+
+    local okVit, errVit = pcall(function()
+        if info.Vitorias and info.Vitorias > 0 then
+            ODS_Vitorias:SetAsync(chave, math.floor(info.Vitorias))
+            alterou = true
+        end
+    end)
+    if not okVit then warn("[LeaderboardManager] Erro ODS Vitórias:", errVit) end
+
+    local okPts, errPts = pcall(function()
+        if info.Pontos and info.Pontos > 0 then
+            ODS_Pontos:SetAsync(chave, math.floor(info.Pontos))
+            alterou = true
+        end
+    end)
+    if not okPts then warn("[LeaderboardManager] Erro ODS Pontos:", errPts) end
+
+    local okRbx, errRbx = pcall(function()
+        if info.RobuxGasto and info.RobuxGasto > 0 then
+            ODS_Robux:SetAsync(chave, math.floor(info.RobuxGasto))
+            alterou = true
+        end
+    end)
+    if not okRbx then warn("[LeaderboardManager] Erro ODS Robux:", errRbx) end
+
+    if alterou then
+        task.delay(1, function()
+            LeaderboardManager.AtualizarTodosRankings()
+        end)
+    end
 end
 
 -- Processa fila pendente de atualização no OrderedDataStore
 local function processarFilaODS()
     for userIdStr, info in pairs(pendentesSalvar) do
         pendentesSalvar[userIdStr] = nil
-        pcall(function()
-            if info.Vitorias > 0 then
-                ODS_Vitorias:SetAsync(info.UserId, math.floor(info.Vitorias))
-            end
-            if info.Pontos > 0 then
-                ODS_Pontos:SetAsync(info.UserId, math.floor(info.Pontos))
-            end
-            if info.RobuxGasto > 0 then
-                ODS_Robux:SetAsync(info.UserId, math.floor(info.RobuxGasto))
-            end
-        end)
+        LeaderboardManager.SalvarEntradaODS(userIdStr, info)
         task.wait(0.2)
     end
 end
@@ -95,9 +128,47 @@ local function carregarTopRanking(ods, categoria)
                 })
             end
         end
+    else
+        warn("[LeaderboardManager] Falha ao consultar ranking " .. categoria .. ":", tostring(pages))
     end
     
     cacheRanking[categoria] = lista
+end
+
+-- Migra dados existentes de jogadores do TrucoData_v1 para os OrderedDataStores
+local function migrarDadosExistentes()
+    local ok, pages = pcall(function()
+        return TrucoDataStore:ListKeysAsync()
+    end)
+    
+    if ok and pages then
+        print("[LeaderboardManager] Sincronizando dados históricos com OrderedDataStore...")
+        while true do
+            local keys = pages:GetCurrentPage()
+            for _, keyObj in ipairs(keys) do
+                local keyName = tostring(keyObj.KeyName)
+                local numUserId = tonumber(keyName)
+                if numUserId then
+                    local okDados, dados = pcall(function()
+                        return TrucoDataStore:GetAsync(numUserId)
+                    end)
+                    if okDados and type(dados) == "table" then
+                        LeaderboardManager.SalvarEntradaODS(keyName, {
+                            Vitorias = dados.Vitorias or 0,
+                            Pontos = dados.Pontos or 0,
+                            RobuxGasto = dados.RobuxGasto or 0
+                        })
+                    end
+                    task.wait(0.2)
+                end
+            end
+            if pages.IsFinished then break end
+            local okNext = pcall(function() pages:AdvanceToNextPageAsync() end)
+            if not okNext then break end
+        end
+        print("[LeaderboardManager] Sincronização histórica concluída.")
+        LeaderboardManager.AtualizarTodosRankings()
+    end
 end
 
 function LeaderboardManager.AtualizarTodosRankings()
@@ -348,12 +419,23 @@ function LeaderboardManager.Inicializar()
         LeaderboardManager.AtualizarODSJogador(jogador, dados)
     end
 
+    -- Registra jogadores que já estejam online
+    for _, jog in ipairs(Players:GetPlayers()) do
+        local dados = DataManager.ObterDados(jog)
+        if dados then
+            LeaderboardManager.AtualizarODSJogador(jog, dados)
+        end
+    end
+
     LeaderboardManager._ConfigurarQuadroNoMapa()
 
     -- Primeira carga
     task.spawn(function()
-        task.wait(2)
+        task.wait(1)
         LeaderboardManager.AtualizarTodosRankings()
+        -- Inicia migração de jogadores existentes no banco em background
+        task.wait(3)
+        migrarDadosExistentes()
     end)
 
     -- Loop de persistência periódica de ODS
