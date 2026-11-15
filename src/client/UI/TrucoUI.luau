@@ -4,6 +4,17 @@ local Eventos = game.ReplicatedStorage:WaitForChild("Events")
 local TrucoUI = {}
 local CameraManager -- injetado
 
+-- ==========================================
+-- DESIGN SYSTEM
+-- ==========================================
+local BG_ESCURO  = Color3.fromRGB(18, 18, 24)
+local BG_BOTAO   = Color3.fromRGB(40, 40, 52)
+local VERDE      = Color3.fromRGB(39, 174, 96)
+local VERMELHO   = Color3.fromRGB(200, 50, 50)
+local AMARELO    = Color3.fromRGB(220, 160, 0)
+local TEXTO_PRIM = Color3.new(1, 1, 1)
+local TEXTO_SEC  = Color3.fromRGB(180, 180, 190)
+
 local painelDesafio, barraTempoDesafio
 
 -- (D) Inversão de dependência: CameraManager é injetado, não instanciado aqui
@@ -14,71 +25,124 @@ end
 
 function TrucoUI._CriarPainel(pai)
     painelDesafio = Instance.new("Frame")
-    painelDesafio.Name = "TrucoChallengeFrame"
-    painelDesafio.Size = UDim2.new(0, 350, 0, 220)
-    painelDesafio.Position = UDim2.new(0.5, 0, 0.4, 0)
+    painelDesafio.Name        = "TrucoChallengeFrame"
+    -- Tamanho responsivo com limite máximo
+    painelDesafio.Size        = UDim2.new(0.85, 0, 0, 0)
+    painelDesafio.AutomaticSize = Enum.AutomaticSize.Y
+    painelDesafio.Position    = UDim2.new(0.5, 0, 0.38, 0)
     painelDesafio.AnchorPoint = Vector2.new(0.5, 0.5)
-    painelDesafio.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    painelDesafio.Visible = false
-    painelDesafio.ZIndex = 150
-    painelDesafio.Parent = pai
-    Instance.new("UICorner", painelDesafio)
+    painelDesafio.BackgroundColor3 = BG_ESCURO
+    painelDesafio.Visible     = false
+    painelDesafio.ZIndex      = 150
+    painelDesafio.Parent      = pai
+    Instance.new("UICorner", painelDesafio).CornerRadius = UDim.new(0, 14)
 
+    local bordaDesafio = Instance.new("UIStroke", painelDesafio)
+    bordaDesafio.Thickness = 1.5
+    bordaDesafio.Color     = Color3.fromRGB(55, 55, 70)
+
+    -- Tamanho máximo para telas grandes
+    local sizeCons = Instance.new("UISizeConstraint", painelDesafio)
+    sizeCons.MaxSize = Vector2.new(400, 240)
+
+    -- Padding interno
+    local pad = Instance.new("UIPadding", painelDesafio)
+    pad.PaddingTop    = UDim.new(0, 12)
+    pad.PaddingBottom = UDim.new(0, 12)
+    pad.PaddingLeft   = UDim.new(0, 12)
+    pad.PaddingRight  = UDim.new(0, 12)
+
+    -- Layout vertical para organizar os filhos
+    local listaInterna = Instance.new("UIListLayout", painelDesafio)
+    listaInterna.SortOrder  = Enum.SortOrder.LayoutOrder
+    listaInterna.Padding    = UDim.new(0, 8)
+    listaInterna.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    -- Título
+    local titulo = Instance.new("TextLabel")
+    titulo.Name               = "Title"
+    titulo.Size               = UDim2.new(1, 0, 0, 36)
+    titulo.TextScaled         = true
+    titulo.TextColor3         = TEXTO_PRIM
+    titulo.BackgroundTransparency = 1
+    titulo.Font               = Enum.Font.GothamBlack
+    titulo.LayoutOrder        = 1
+    titulo.ZIndex             = 151
+    titulo.Parent             = painelDesafio
+
+    -- Status
+    local status = Instance.new("TextLabel")
+    status.Name               = "Status"
+    status.Text               = ""
+    status.Size               = UDim2.new(1, 0, 0, 20)
+    status.TextColor3         = TEXTO_SEC
+    status.BackgroundTransparency = 1
+    status.Font               = Enum.Font.GothamMedium
+    status.TextScaled         = false
+    status.TextSize           = 14
+    status.LayoutOrder        = 2
+    status.ZIndex             = 151
+    status.Parent             = painelDesafio
+
+    -- Container dos botões (horizontal)
+    local containerBotoes = Instance.new("Frame")
+    containerBotoes.Size               = UDim2.new(1, 0, 0, 44)
+    containerBotoes.BackgroundTransparency = 1
+    containerBotoes.LayoutOrder        = 3
+    containerBotoes.ZIndex             = 151
+    containerBotoes.Parent             = painelDesafio
+
+    local layoutH = Instance.new("UIListLayout", containerBotoes)
+    layoutH.FillDirection       = Enum.FillDirection.Horizontal
+    layoutH.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layoutH.Padding             = UDim.new(0, 8)
+
+    -- Barra de tempo (trilho)
     local trilho = Instance.new("Frame")
-    trilho.Size = UDim2.new(1, 0, 0, 8)
-    trilho.Position = UDim2.new(0, 0, 1, 0)
-    trilho.AnchorPoint = Vector2.new(0, 1)
-    trilho.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    trilho.Parent = painelDesafio
+    trilho.Size          = UDim2.new(1, 0, 0, 6)
+    trilho.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    trilho.LayoutOrder   = 4
+    trilho.ZIndex        = 151
+    trilho.Parent        = painelDesafio
+    Instance.new("UICorner", trilho).CornerRadius = UDim.new(1, 0)
 
     barraTempoDesafio = Instance.new("Frame")
-    barraTempoDesafio.Size = UDim2.new(1, 0, 1, 0)
-    barraTempoDesafio.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    barraTempoDesafio.BorderSizePixel = 0
-    barraTempoDesafio.Parent = trilho
+    barraTempoDesafio.Size          = UDim2.new(1, 0, 1, 0)
+    barraTempoDesafio.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    barraTempoDesafio.BorderSizePixel  = 0
+    barraTempoDesafio.ZIndex          = 152
+    barraTempoDesafio.Parent          = trilho
+    Instance.new("UICorner", barraTempoDesafio).CornerRadius = UDim.new(1, 0)
 
-    -- Título e status
-    local titulo = Instance.new("TextLabel")
-    titulo.Name = "Title"
-    titulo.Size = UDim2.new(1, 0, 0.3, 0)
-    titulo.TextScaled = true
-    titulo.TextColor3 = Color3.new(1, 1, 1)
-    titulo.BackgroundTransparency = 1
-    titulo.Parent = painelDesafio
-
-    local status = Instance.new("TextLabel")
-    status.Name = "Status"
-    status.Text = ""
-    status.Size = UDim2.new(1, 0, 0.15, 0)
-    status.Position = UDim2.new(0, 0, 0.3, 0)
-    status.TextColor3 = Color3.fromRGB(255, 200, 0)
-    status.BackgroundTransparency = 1
-    status.Parent = painelDesafio
-
-    -- Botões
-    local function criarBotao(texto, cor, posX, resposta, nome)
+    -- Botões DESCER / FUGIR / AUMENTAR
+    local function criarBotao(texto, cor, resposta, nome)
         local btn = Instance.new("TextButton")
-        btn.Name = nome
-        btn.Text = texto
-        btn.Size = UDim2.new(0.28, 0, 0.35, 0)
-        btn.Position = UDim2.new(posX, 0, 0.55, 0)
+        btn.Name            = nome
+        btn.Text            = texto
+        btn.Size            = UDim2.new(0.3, 0, 1, 0)
         btn.BackgroundColor3 = cor
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 20
-        btn.Parent = painelDesafio
-        Instance.new("UICorner", btn)
+        btn.TextColor3      = TEXTO_PRIM
+        btn.Font            = Enum.Font.GothamBold
+        btn.TextScaled      = false
+        btn.TextSize        = 15
+        btn.AutoButtonColor = true
+        btn.ZIndex          = 152
+        btn.Parent          = containerBotoes
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+        local tsConstraint = Instance.new("UITextSizeConstraint", btn)
+        tsConstraint.MaxTextSize = 18
 
         btn.Activated:Connect(function()
-            status.Text = "Aguardando Parceiro..."
-            btn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+            status.Text         = "Aguardando Parceiro..."
+            btn.BackgroundColor3 = BG_BOTAO
             Eventos.TrucoEvent:FireServer("Response", resposta)
         end)
     end
 
-    criarBotao("DESCER",   Color3.fromRGB(0, 150, 0),    0.04, "Aceitar",  "AceitarBtn")
-    criarBotao("FUGIR",    Color3.fromRGB(150, 0, 0),    0.36, "Correr",   "CorrerBtn")
-    criarBotao("AUMENTAR", Color3.fromRGB(200, 150, 0),  0.68, "Aumentar", "AumentarBtn")
+    criarBotao("DESCER",   VERDE,    "Aceitar",  "AceitarBtn")
+    criarBotao("FUGIR",    VERMELHO, "Correr",   "CorrerBtn")
+    criarBotao("AUMENTAR", AMARELO,  "Aumentar", "AumentarBtn")
 end
 
 function TrucoUI.Mostrar(valor, quemPediu, tempoLimite)
@@ -88,14 +152,14 @@ function TrucoUI.Mostrar(valor, quemPediu, tempoLimite)
     local btnCorr  = painelDesafio:FindFirstChild("CorrerBtn")
     local btnAum   = painelDesafio:FindFirstChild("AumentarBtn")
 
-    if titulo then titulo.Text = quemPediu .. " PEDIU " .. valor .. "!" end
-    if status then status.Text = "Decidam juntos!" end
-    if btnAceit then btnAceit.BackgroundColor3 = Color3.fromRGB(0, 150, 0) end
-    if btnCorr  then btnCorr.BackgroundColor3  = Color3.fromRGB(150, 0, 0) end
+    if titulo   then titulo.Text  = quemPediu .. " PEDIU " .. valor .. "!" end
+    if status   then status.Text  = "Decidam juntos!" end
+    if btnAceit then btnAceit.BackgroundColor3 = VERDE    end
+    if btnCorr  then btnCorr.BackgroundColor3  = VERMELHO end
     if btnAum   then
-        btnAum.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+        btnAum.BackgroundColor3 = AMARELO
         local prox = (valor < 12) and (valor + 3) or 12
-        btnAum.Text = prox .. "!"
+        btnAum.Text    = prox .. "!"
         btnAum.Visible = (valor < 12)
     end
 

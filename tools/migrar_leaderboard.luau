@@ -1,13 +1,12 @@
 --[[
-    MIGRAÇÃO DE BANCO DE DADOS (ONE-TIME RUN)
-    Truco Paulista - Migração de TrucoData_v1 -> OrderedDataStores (Global Leaderboards)
+    MIGRAÇÃO INTELIGENTE (PULA JÁ MIGRADOS E PULA ZEROS)
+    Truco Paulista - Zero desperdício de requisições
 
-    COMO EXECUTAR NO ROBLOX STUDIO:
-    1. Abra o seu projeto no Roblox Studio.
-    2. Certifique-se de que "Enable Studio Access to API Services" esteja marcado em:
-       Game Settings > Security > Enable Studio Access to API Services.
-    3. Abra a Command Bar (Barra de Comando) do Studio (View > Command Bar).
-    4. Copie e cole todo este código abaixo na Command Bar e pressione ENTER.
+    Como funciona:
+    1. Lê a lista de jogadores que já estão no Leaderboard_Pontos e guarda em memória.
+    2. Pula instantaneamente qualquer jogador que já foi cadastrado antes.
+    3. Pula qualquer jogador com 0 pontos e 0 vitórias.
+    4. Grava apenas os jogadores que ainda faltavam!
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -17,13 +16,33 @@ local ODS_Vitorias   = DataStoreService:GetOrderedDataStore("Leaderboard_Vitoria
 local ODS_Pontos     = DataStoreService:GetOrderedDataStore("Leaderboard_Pontos_v1")
 local ODS_Robux      = DataStoreService:GetOrderedDataStore("Leaderboard_Robux_v1")
 
-print("----------------------------------------------------------------")
-print("🚀 [MIGRAÇÃO] Iniciando varredura e consolidação do Leaderboard...")
-print("----------------------------------------------------------------")
+print("================================================================")
+print("🔍 [FASE 1] Verificando quem já está cadastrado no Leaderboard...")
 
-local totalChaves = 0
-local totalMigrados = 0
-local totalFalhas = 0
+-- 1. Carrega todos os UserIds que já existem no OrderedDataStore em uma tabela de consulta rápida
+local jaMigrados = {}
+local countJaNoBanco = 0
+
+local okODS, pagesODS = pcall(function()
+    return ODS_Pontos:GetSortedAsync(false, 100)
+end)
+
+if okODS and pagesODS then
+    while true do
+        for _, entry in ipairs(pagesODS:GetCurrentPage()) do
+            local key = tostring(entry.key)
+            jaMigrados[key] = true
+            countJaNoBanco += 1
+        end
+        if pagesODS.IsFinished then break end
+        local okAdvance = pcall(function() pagesODS:AdvanceToNextPageAsync() end)
+        if not okAdvance then break end
+    end
+end
+
+print(string.format("✅ Encontrados %d jogadores que já estavam salvos no Leaderboard!", countJaNoBanco))
+print("🚀 [FASE 2] Iniciando varredura apenas para os que FALTAM...")
+print("================================================================")
 
 local ok, pages = pcall(function()
     return TrucoDataStore:ListKeysAsync()
@@ -31,74 +50,84 @@ end)
 
 if not ok or not pages then
     warn("❌ Erro ao listar chaves do TrucoData_v1:", tostring(pages))
-    warn("Certifique-se de que a opção 'Enable Studio Access to API Services' está ATIVA em Game Settings > Security.")
     return
 end
 
+local totalAvaliados = 0
+local totalNovosSalvos = 0
+local totalPuladosJaMigrados = 0
+local totalPuladosZeros = 0
+
 while true do
-    local keys = pages:GetCurrentPage()
-    for _, keyObj in ipairs(keys) do
-        totalChaves += 1
+    for _, keyObj in ipairs(pages:GetCurrentPage()) do
+        totalAvaliados += 1
         local keyName = tostring(keyObj.KeyName)
-        local numUserId = tonumber(keyName)
 
-        if numUserId then
-            local okDados, dados = pcall(function()
-                return TrucoDataStore:GetAsync(numUserId)
-            end)
+        -- 1. SE JÁ FOI MIGRADO ANTERIORMENTE -> PULA INSTANTANEAMENTE SEM GASTAR REQUEST
+        if jaMigrados[keyName] then
+            totalPuladosJaMigrados += 1
+        else
+            local numUserId = tonumber(keyName)
+            if numUserId then
+                local okDados, dados = pcall(function()
+                    return TrucoDataStore:GetAsync(numUserId)
+                end)
 
-            if okDados and type(dados) == "table" then
-                local migrouAlgo = false
+                if okDados and type(dados) == "table" then
+                    local pts = (dados.Pontos and dados.Pontos > 0) and math.floor(dados.Pontos) or 0
+                    local vit = (dados.Vitorias and dados.Vitorias > 0) and math.floor(dados.Vitorias) or 0
+                    local rbx = (dados.RobuxGasto and dados.RobuxGasto > 0) and math.floor(dados.RobuxGasto) or 0
 
-                -- 1. Migra Pontos
-                if dados.Pontos and dados.Pontos > 0 then
-                    local okP, errP = pcall(function()
-                        ODS_Pontos:SetAsync(keyName, math.floor(dados.Pontos))
-                    end)
-                    if okP then migrouAlgo = true else warn("Erro ao migrar Pontos de " .. keyName .. ":", errP) end
+                    -- 2. SE TEM 0 EM TUDO -> PULA TAMBÉM
+                    if pts == 0 and vit == 0 and rbx == 0 then
+                        totalPuladosZeros += 1
+                    else
+                        -- 3. JOGADOR NOVO QUE AINDA NÃO TINHA SIDO MIGRADO!
+                        totalNovosSalvos += 1
+                        local infoStr = {}
+
+                        if pts > 0 then
+                            pcall(function() ODS_Pontos:SetAsync(keyName, pts) end)
+                            table.insert(infoStr, pts .. " Pts")
+                            task.wait(0.3)
+                        end
+
+                        if vit > 0 then
+                            pcall(function() ODS_Vitorias:SetAsync(keyName, vit) end)
+                            table.insert(infoStr, vit .. " Vitórias")
+                            task.wait(0.3)
+                        end
+
+                        if rbx > 0 then
+                            pcall(function() ODS_Robux:SetAsync(keyName, rbx) end)
+                            table.insert(infoStr, rbx .. " Robux")
+                            task.wait(0.3)
+                        end
+
+                        print(string.format("⭐ [%d] NOVO UserId %s adicionado ao ranking! (%s)",
+                            totalNovosSalvos, keyName, table.concat(infoStr, " | ")))
+
+                        task.wait(0.5)
+                    end
                 end
-
-                -- 2. Migra Vitórias
-                if dados.Vitorias and dados.Vitorias > 0 then
-                    local okV, errV = pcall(function()
-                        ODS_Vitorias:SetAsync(keyName, math.floor(dados.Vitorias))
-                    end)
-                    if okV then migrouAlgo = true else warn("Erro ao migrar Vitórias de " .. keyName .. ":", errV) end
-                end
-
-                -- 3. Migra Robux
-                if dados.RobuxGasto and dados.RobuxGasto > 0 then
-                    local okR, errR = pcall(function()
-                        ODS_Robux:SetAsync(keyName, math.floor(dados.RobuxGasto))
-                    end)
-                    if okR then migrouAlgo = true else warn("Erro ao migrar Robux de " .. keyName .. ":", errR) end
-                end
-
-                if migrouAlgo then
-                    totalMigrados += 1
-                    print(string.format("✅ [%d] UserId %s: Pontos=%d, Vitórias=%d, Robux=%d",
-                        totalMigrados, keyName, dados.Pontos or 0, dados.Vitorias or 0, dados.RobuxGasto or 0))
-                end
-            else
-                totalFalhas += 1
-                warn("⚠️ Falha ao ler dados do UserId " .. keyName)
             end
-
-            -- Pausa suave para respeitar os limites de requisição da DataStore API
-            task.wait(0.2)
         end
     end
 
     if pages.IsFinished then break end
     local okNext, errNext = pcall(function() pages:AdvanceToNextPageAsync() end)
     if not okNext then
-        warn("Erro ao avançar para próxima página:", errNext)
-        break
+        warn("Pausa de 2s para avançar página...")
+        task.wait(2)
+        local okRetry = pcall(function() pages:AdvanceToNextPageAsync() end)
+        if not okRetry then break end
     end
 end
 
-print("----------------------------------------------------------------")
-print(string.format("🎉 [MIGRAÇÃO CONCLUÍDA] Chaves avaliadas: %d | Jogadores cadastrados no ranking: %d | Falhas: %d",
-    totalChaves, totalMigrados, totalFalhas))
-print("Os dados agora estão 100% salvos e globais em todos os servidores!")
-print("----------------------------------------------------------------")
+print("================================================================")
+print("🎉 [PROCESSO FINALIZADO]")
+print(string.format("• Total avaliados: %d", totalAvaliados))
+print(string.format("• Já estavam migrados (pulados em 0s): %d", totalPuladosJaMigrados))
+print(string.format("• Jogadores com zero (descartados): %d", totalPuladosZeros))
+print(string.format("• Novos jogadores gravados com sucesso: %d", totalNovosSalvos))
+print("================================================================")

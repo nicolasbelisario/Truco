@@ -329,67 +329,108 @@ end
 -- MONTAGEM DA INTERFACE
 -- ====================================================================
 
-function LeaderboardUI.Inicializar(parentGui)
+function LeaderboardUI.Inicializar(parentGui, containerMenu)
     -- 1. BOTÃO REDONDO PRETO PADRÃO NO TOPO DA UI
-    btnLeaderboard = Instance.new("TextButton", parentGui)
-    btnLeaderboard.Name = "BtnLeaderboard"
-    btnLeaderboard.Size = UDim2.new(0, 46, 0, 46)
-    btnLeaderboard.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-    btnLeaderboard.BackgroundTransparency = 0.25
-    btnLeaderboard.Text = "🏆"
-    btnLeaderboard.TextColor3 = Color3.new(1, 1, 1)
-    btnLeaderboard.Font = Enum.Font.GothamBlack
-    btnLeaderboard.TextSize = 22
-    btnLeaderboard.ZIndex = 40
+    if containerMenu then
+        btnLeaderboard = Instance.new("TextButton", containerMenu)
+        btnLeaderboard.Name = "BtnLeaderboard"
+        btnLeaderboard.Size = UDim2.new(0, 46, 0, 46)
+        btnLeaderboard.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+        btnLeaderboard.BackgroundTransparency = 0.25
+        btnLeaderboard.Text = "🏆"
+        btnLeaderboard.TextColor3 = Color3.new(1, 1, 1)
+        btnLeaderboard.Font = Enum.Font.GothamBlack
+        btnLeaderboard.TextSize = 22
+        btnLeaderboard.LayoutOrder = 1
+        btnLeaderboard.ZIndex = 41
+        btnLeaderboard.AutoButtonColor = true
 
-    local function recalcularPosicaoBotao()
-        if not btnLeaderboard then return end
-        local inset = GuiService:GetGuiInset()
-        local alturaTopbar = math.max(inset.Y, 54)
-        btnLeaderboard.Position = UDim2.new(0, 16, 0, alturaTopbar + 12)
+        Instance.new("UICorner", btnLeaderboard).CornerRadius = UDim.new(1, 0)
+
+        local strokeBtn = Instance.new("UIStroke", btnLeaderboard)
+        strokeBtn.Color = Color3.fromRGB(255, 255, 255)
+        strokeBtn.Transparency = 0.8
+        strokeBtn.Thickness = 1.5
+
+        btnLeaderboard.MouseEnter:Connect(function()
+            TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
+                BackgroundTransparency = 0.05,
+                BackgroundColor3 = Color3.fromRGB(38, 38, 46)
+            }):Play()
+        end)
+        btnLeaderboard.MouseLeave:Connect(function()
+            TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
+                BackgroundTransparency = 0.25,
+                BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+            }):Play()
+        end)
+
+        btnLeaderboard.Activated:Connect(function()
+            LeaderboardUI.Alternar()
+        end)
+    else
+        btnLeaderboard = Instance.new("TextButton", parentGui)
+        btnLeaderboard.Name = "BtnLeaderboard"
+        btnLeaderboard.Size = UDim2.new(0, 46, 0, 46)
+        btnLeaderboard.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+        btnLeaderboard.BackgroundTransparency = 0.25
+        btnLeaderboard.Text = "🏆"
+        btnLeaderboard.TextColor3 = Color3.new(1, 1, 1)
+        btnLeaderboard.Font = Enum.Font.GothamBlack
+        btnLeaderboard.TextSize = 22
+        btnLeaderboard.ZIndex = 40
+
+        local function recalcularPosicaoBotao()
+            if not btnLeaderboard then return end
+            local inset = GuiService:GetGuiInset()
+            local alturaTopbar = math.max(inset.Y, 54)
+            btnLeaderboard.Position = UDim2.new(0, 16, 0, alturaTopbar + 12)
+        end
+
+        recalcularPosicaoBotao()
+        GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(recalcularPosicaoBotao)
+        if workspace.CurrentCamera then
+            workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(recalcularPosicaoBotao)
+        end
+        
+        Instance.new("UICorner", btnLeaderboard).CornerRadius = UDim.new(1, 0)
+        
+        local strokeBtn = Instance.new("UIStroke", btnLeaderboard)
+        strokeBtn.Color = Color3.fromRGB(255, 255, 255)
+        strokeBtn.Transparency = 0.8
+        strokeBtn.Thickness = 1.5
+
+        btnLeaderboard.MouseEnter:Connect(function()
+            TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
+                BackgroundTransparency = 0.05,
+                BackgroundColor3 = Color3.fromRGB(38, 38, 46)
+            }):Play()
+        end)
+        btnLeaderboard.MouseLeave:Connect(function()
+            TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
+                BackgroundTransparency = 0.25,
+                BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+            }):Play()
+        end)
+
+        btnLeaderboard.Activated:Connect(function()
+            LeaderboardUI.Alternar()
+        end)
     end
 
-    recalcularPosicaoBotao()
-    GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(recalcularPosicaoBotao)
-    if workspace.CurrentCamera then
-        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(recalcularPosicaoBotao)
-    end
-    
-    Instance.new("UICorner", btnLeaderboard).CornerRadius = UDim.new(1, 0) -- Perfeitamente redondo
-    
-    local strokeBtn = Instance.new("UIStroke", btnLeaderboard)
-    strokeBtn.Color = Color3.fromRGB(255, 255, 255)
-    strokeBtn.Transparency = 0.8
-    strokeBtn.Thickness = 1.5
-
-    -- Animação de hover
-    btnLeaderboard.MouseEnter:Connect(function()
-        TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.05,
-            BackgroundColor3 = Color3.fromRGB(38, 38, 46)
-        }):Play()
-    end)
-    btnLeaderboard.MouseLeave:Connect(function()
-        TweenService:Create(btnLeaderboard, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.25,
-            BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-        }):Play()
-    end)
-
-    btnLeaderboard.Activated:Connect(function()
-        LeaderboardUI.Alternar()
-    end)
-
-    -- 2. PAINEL MODAL DO LEADERBOARD
+    -- 2. PAINEL MODAL DO LEADERBOARD (Responsivo para PC e Mobile)
     modalLeaderboard = Instance.new("Frame", parentGui)
     modalLeaderboard.Name = "ModalLeaderboard"
-    modalLeaderboard.Size = UDim2.new(0, 560, 0, 480)
+    modalLeaderboard.Size = UDim2.new(0.9, 0, 0.85, 0)
     modalLeaderboard.Position = UDim2.new(0.5, 0, 0.5, 0)
     modalLeaderboard.AnchorPoint = Vector2.new(0.5, 0.5)
     modalLeaderboard.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
     modalLeaderboard.BorderSizePixel = 0
     modalLeaderboard.Visible = false
     modalLeaderboard.ZIndex = 80
+
+    local sizeCons = Instance.new("UISizeConstraint", modalLeaderboard)
+    sizeCons.MaxSize = Vector2.new(560, 480)
 
     Instance.new("UICorner", modalLeaderboard).CornerRadius = UDim.new(0, 16)
     local strokeModal = Instance.new("UIStroke", modalLeaderboard)
@@ -419,7 +460,7 @@ function LeaderboardUI.Inicializar(parentGui)
     btnFechar.Position = UDim2.new(1, -16, 0.5, 0)
     btnFechar.AnchorPoint = Vector2.new(1, 0.5)
     btnFechar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btnFechar.Text = "✕"
+    btnFechar.Text = "X"
     btnFechar.TextColor3 = Color3.new(1, 1, 1)
     btnFechar.Font = Enum.Font.GothamBold
     btnFechar.TextSize = 18

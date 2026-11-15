@@ -211,6 +211,10 @@ function Partida:DefinirSkinsDosBots()
                         pcall(function()
                             botVisual.Humanoid:ApplyDescription(avatares[i])
                         end)
+                        local banco = assentoBot:FindFirstChildWhichIsA("Seat")
+                        if banco then
+                            self:SentarBotNoBanco(botVisual, banco)
+                        end
                     end
                 end
             end
@@ -266,6 +270,10 @@ function Partida:ResetarPartida(motivo)
                         pcall(function()
                             botVisual.Humanoid:ApplyDescription(humanoidLimpo:GetAppliedDescription())
                         end)
+                        local banco = assentoBot:FindFirstChildWhichIsA("Seat")
+                        if banco then
+                            self:SentarBotNoBanco(botVisual, banco)
+                        end
                     end
                     templateLimpo:Destroy()
                 end
@@ -528,6 +536,62 @@ end
     @param nomeAssento string: O nome do assento (ex: "Cadeira1").
     @param nomeExibicao string: O nome visível que ficará na cabeça do avatar.
 ]]
+--[[
+    Senta e anima o avatar 3D do Bot no banco correspondente com a pose de sentar correta.
+    Garante que o bot fique fixado na cadeira, com animação ativa e sem colidir com acessórios/cenário.
+]]
+function Partida:SentarBotNoBanco(botVisual, banco)
+    local humanoide = botVisual:FindFirstChild("Humanoid")
+    local hrp = botVisual:FindFirstChild("HumanoidRootPart")
+    if not (banco and humanoide and hrp) then return end
+
+    -- 1. Remove qualquer SeatWeld ou Weld antigo para evitar acúmulo de transformações
+    for _, filho in ipairs(banco:GetChildren()) do
+        if filho.Name == "SeatWeld" or filho:IsA("WeldConstraint") then
+            filho:Destroy()
+        end
+    end
+
+    -- 2. Desativa colisão e massa de todas as partes e acessórios (impede que chapéus/halos empurrem o bot pro ar)
+    for _, parte in ipairs(botVisual:GetDescendants()) do
+        if parte:IsA("BasePart") then
+            parte.Anchored = false
+            parte.CanCollide = false
+            parte.Massless = true
+        end
+    end
+
+    -- 3. Posiciona o HumanoidRootPart exatamente onde ele deve sentar (0.65 studs acima da superfície da cadeira)
+    local alturaSuperficie = banco.Size.Y / 2
+    local offsetSentado = 0.65
+    local seatTopCFrame = banco.CFrame * CFrame.new(0, alturaSuperficie, 0)
+    local hrpCFrameAlvo = seatTopCFrame * CFrame.new(0, offsetSentado, 0)
+    
+    botVisual:PivotTo(hrpCFrameAlvo)
+
+    -- 4. Cria a fixação rígida (Weld) direta entre o banco e o HumanoidRootPart
+    local weld = Instance.new("Weld")
+    weld.Name = "SeatWeld"
+    weld.Part0 = banco
+    weld.Part1 = hrp
+    weld.C0 = CFrame.new(0, alturaSuperficie, 0)
+    weld.C1 = CFrame.new(0, -offsetSentado, 0)
+    weld.Parent = banco
+
+    -- 5. Atualiza o estado do Humanoid
+    humanoide.Sit = true
+    humanoide:ChangeState(Enum.HumanoidStateType.Seated)
+
+    -- 6. Toca a animação oficial de Sentar R15 (SitAnim)
+    local animator = humanoide:FindFirstChildWhichIsA("Animator") or Instance.new("Animator", humanoide)
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "http://www.roblox.com/asset/?id=2506281703"
+    local track = animator:LoadAnimation(anim)
+    track.Priority = Enum.AnimationPriority.Action4
+    track.Looped = true
+    track:Play()
+end
+
 function Partida:GerarBotVisual(nomeAssento, nomeExibicao)
     local modeloAssento = self.Modelo:WaitForChild("Cadeiras"):FindFirstChild(nomeAssento)
     if not modeloAssento then return end
@@ -545,13 +609,7 @@ function Partida:GerarBotVisual(nomeAssento, nomeExibicao)
     
     botVisual.Parent = modeloAssento 
     if banco and humanoide then
-        botVisual:SetPrimaryPartCFrame(banco.CFrame + Vector3.new(0, 2, 0))
-        banco:Sit(humanoide)
-        task.delay(0.2, function()
-            for _, parte in ipairs(botVisual:GetDescendants()) do
-                if parte:IsA("BasePart") then parte.Anchored = true; parte.CanCollide = false end
-            end
-        end)
+        self:SentarBotNoBanco(botVisual, banco)
     end
 end
 
