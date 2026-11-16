@@ -26,11 +26,11 @@ end
 function TrucoUI._CriarPainel(pai)
     painelDesafio = Instance.new("Frame")
     painelDesafio.Name        = "TrucoChallengeFrame"
-    -- Tamanho responsivo com limite máximo
+    -- Posicionado no topo para deixar o personagem em destaque no centro
     painelDesafio.Size        = UDim2.new(0.85, 0, 0, 0)
     painelDesafio.AutomaticSize = Enum.AutomaticSize.Y
-    painelDesafio.Position    = UDim2.new(0.5, 0, 0.38, 0)
-    painelDesafio.AnchorPoint = Vector2.new(0.5, 0.5)
+    painelDesafio.Position    = UDim2.new(0.5, 0, 0, 56)
+    painelDesafio.AnchorPoint = Vector2.new(0.5, 0)
     painelDesafio.BackgroundColor3 = BG_ESCURO
     painelDesafio.Visible     = false
     painelDesafio.ZIndex      = 150

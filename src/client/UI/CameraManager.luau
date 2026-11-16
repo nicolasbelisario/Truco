@@ -3,12 +3,40 @@ local TweenService = game:GetService("TweenService")
 
 local CameraManager = {}
 local Camera = workspace.CurrentCamera
+local pastaMesaAtual = nil
+
+local function obterPersonagemAlvo(nomeAlvo)
+    if not nomeAlvo then return nil end
+
+    local jogador = Players:FindFirstChild(nomeAlvo)
+    if jogador and jogador.Character then
+        return jogador.Character
+    end
+
+    if pastaMesaAtual then
+        local pastaCadeiras = pastaMesaAtual:FindFirstChild("Cadeiras")
+        if pastaCadeiras then
+            for _, caixaAssento in ipairs(pastaCadeiras:GetChildren()) do
+                local botModel = caixaAssento:FindFirstChild(nomeAlvo)
+                if botModel then
+                    return botModel
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+function CameraManager.DefinirMesaAtual(modeloMesa)
+    pastaMesaAtual = modeloMesa
+end
 
 function CameraManager.AplicarTensao(nomeAlvo)
-    local alvo = Players:FindFirstChild(nomeAlvo)
-    if not alvo or not alvo.Character then return end
+    local personagem = obterPersonagemAlvo(nomeAlvo)
+    if not personagem then return end
 
-    local head = alvo.Character:FindFirstChild("Head")
+    local head = personagem:FindFirstChild("Head")
     if not head then return end
 
     Camera.CameraType = Enum.CameraType.Scriptable

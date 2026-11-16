@@ -43,10 +43,15 @@ local painelCorte, barraTempoCorte
 local painelEmotes, callbackEmote
 local painelVira
 local painelOpcoesJogada
+local painelMaoDeOnze
+local containerCartasParceiro, statusLabelMaoDeOnze, btnJogarMaoDeOnze, btnCorrerMaoDeOnze
 
 -- VARIÁVEIS RESTAURADAS DO CÓDIGO ANTIGO
 local textoCronometro
 local valorRodadaAtual = 1
+local dadosJogador = { SkinEquipada = "Padrao" }
+local viraAtual = nil
+local imgViraAtual = nil
 
 -- Barra de menu principal (topo-esquerdo: 🏆 Ranking, 🛒 Loja, ❓ Ajuda, 🔊 Som)
 local barraMenuPrincipal
@@ -114,6 +119,7 @@ function UIManager.Inicializar()
     UIManager._CriarMenuAdmin()
     UIManager._CriarMenuCorte()
     UIManager._CriarBotoesEmote()
+    UIManager._CriarMenuMaoDeOnze()
 end
 
 -- ==========================================
@@ -205,12 +211,20 @@ function UIManager.AdicionarCartaMao(card)         HandUI.AdicionarCarta(card) e
 function UIManager.AdicionarCartaJogadaUI(...)     TableUI.AdicionarCarta(...) end
 function UIManager.LimparMesa()                    TableUI.Limpar() end
 function UIManager.TocarSom(nome)                  SoundManager.Tocar(nome) end
+function UIManager.DefinirMesaAtual(modeloMesa)    CameraManager.DefinirMesaAtual(modeloMesa) end
 function UIManager.ResetarCamera()                 CameraManager.Resetar() end
-function UIManager.MostrarDesafioTruco(v, q, t)   TrucoUI.Mostrar(v, q, t) end
-function UIManager.OcultarDesafioTruco()           TrucoUI.Ocultar() end
+function UIManager.MostrarDesafioTruco(v, q, t)   TableUI.DefinirModoLateral(true); TrucoUI.Mostrar(v, q, t) end
+function UIManager.OcultarDesafioTruco()           TrucoUI.Ocultar(); TableUI.DefinirModoLateral(false) end
 function UIManager.AtualizarStatusDesafio(msg)     TrucoUI.AtualizarStatus(msg) end
 function UIManager.MostrarTutorial(abrir)          TutorialUI.Mostrar(abrir) end
-function UIManager.AtualizarDadosJogador(dados)    ShopUI.AtualizarDados(dados); HandUI.DefinirEstado(eMinhaVez, nil, nil, dados) end
+function UIManager.AtualizarDadosJogador(dados)
+    if dados then dadosJogador = dados end
+    ShopUI.AtualizarDados(dados)
+    HandUI.DefinirEstado(eMinhaVez, nil, nil, dados)
+    if imgViraAtual and imgViraAtual.Parent and viraAtual then
+        CardSettings.AplicarSkinCarta(imgViraAtual, viraAtual.valor, viraAtual.naipe, false, dadosJogador.SkinEquipada or "Padrao")
+    end
+end
 function UIManager.MostrarPlacar()                 ScoreUI.MostrarPlacar(estaSentado) end
 function UIManager.OcultarPlacar()                 ScoreUI.OcultarPlacar() end
 
@@ -463,6 +477,7 @@ function UIManager.DefinirVira(val, naipe)
         if not filho:IsA("UICorner") then filho:Destroy() end
     end
 
+    viraAtual = { valor = val, naipe = naipe }
     painelVira.Visible = estaSentado
     local tituloLbl = Instance.new("TextLabel")
     tituloLbl.Text               = "VIRA"
@@ -479,8 +494,9 @@ function UIManager.DefinirVira(val, naipe)
     imgVira.AnchorPoint      = Vector2.new(0.5, 0.5)
     imgVira.BackgroundTransparency = 1
     imgVira.Parent           = painelVira
+    imgViraAtual             = imgVira
 
-    CardSettings.AplicarSkinCarta(imgVira, val, naipe, false, "Padrao")
+    CardSettings.AplicarSkinCarta(imgVira, val, naipe, false, dadosJogador.SkinEquipada or "Padrao")
 
     local textoCarta = Instance.new("TextLabel")
     textoCarta.Text               = val .. " " .. naipe
@@ -650,6 +666,195 @@ function UIManager.OcultarMenuCorte()
     if painelCorte then painelCorte.Visible = false end
 end
 
+-- ==========================================
+-- MENU / MODAL MÃO DE ONZE
+-- ==========================================
+
+function UIManager._CriarMenuMaoDeOnze()
+    painelMaoDeOnze = Instance.new("Frame")
+    painelMaoDeOnze.Name                   = "PainelMaoDeOnze"
+    painelMaoDeOnze.Position               = UDim2.new(0.5, 0, 0.44, 0)
+    painelMaoDeOnze.AnchorPoint            = Vector2.new(0.5, 0.5)
+    painelMaoDeOnze.Size                   = UDim2.new(0.9, 0, 0, 0)
+    painelMaoDeOnze.AutomaticSize          = Enum.AutomaticSize.Y
+    painelMaoDeOnze.ZIndex                 = 160
+    painelMaoDeOnze.BackgroundColor3       = BG_ESCURO
+    painelMaoDeOnze.Visible                = false
+    painelMaoDeOnze.Parent                 = painelTela
+
+    local corner = Instance.new("UICorner", painelMaoDeOnze)
+    corner.CornerRadius = UDim.new(0, 14)
+
+    local stroke = Instance.new("UIStroke", painelMaoDeOnze)
+    stroke.Color     = ACENTO
+    stroke.Thickness = 2
+
+    local constraint = Instance.new("UISizeConstraint", painelMaoDeOnze)
+    constraint.MaxSize = Vector2.new(440, 310)
+
+    local padding = Instance.new("UIPadding", painelMaoDeOnze)
+    padding.PaddingTop    = UDim.new(0, 14)
+    padding.PaddingBottom = UDim.new(0, 14)
+    padding.PaddingLeft   = UDim.new(0, 14)
+    padding.PaddingRight  = UDim.new(0, 14)
+
+    local layout = Instance.new("UIListLayout", painelMaoDeOnze)
+    layout.FillDirection       = Enum.FillDirection.Vertical
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder           = Enum.SortOrder.LayoutOrder
+    layout.Padding             = UDim.new(0, 10)
+
+    -- Título (LayoutOrder = 1)
+    local titulo = Instance.new("TextLabel")
+    titulo.Name                   = "Titulo"
+    titulo.LayoutOrder            = 1
+    titulo.Size                   = UDim2.new(1, 0, 0, 26)
+    titulo.BackgroundTransparency = 1
+    titulo.Text                   = "🔥 MÃO DE ONZE (VALE 3 PONTOS)"
+    titulo.TextColor3             = ACENTO
+    titulo.Font                   = Enum.Font.GothamBlack
+    titulo.TextSize               = 18
+    titulo.Parent                 = painelMaoDeOnze
+
+    -- Subtítulo (LayoutOrder = 2)
+    local subtitulo = Instance.new("TextLabel")
+    subtitulo.Name                   = "Subtitulo"
+    subtitulo.LayoutOrder            = 2
+    subtitulo.Size                   = UDim2.new(1, 0, 0, 18)
+    subtitulo.BackgroundTransparency = 1
+    subtitulo.Text                   = "Cartas do seu Parceiro:"
+    subtitulo.TextColor3             = TEXTO_PRIM
+    subtitulo.Font                   = Enum.Font.GothamBold
+    subtitulo.TextSize               = 14
+    subtitulo.Parent                 = painelMaoDeOnze
+
+    -- Container Cartas Parceiro (LayoutOrder = 3)
+    containerCartasParceiro = Instance.new("Frame")
+    containerCartasParceiro.Name                   = "ContainerCartasParceiro"
+    containerCartasParceiro.LayoutOrder            = 3
+    containerCartasParceiro.Size                   = UDim2.new(1, 0, 0, 120)
+    containerCartasParceiro.BackgroundTransparency = 1
+    containerCartasParceiro.Parent                 = painelMaoDeOnze
+
+    local layoutCartas = Instance.new("UIListLayout", containerCartasParceiro)
+    layoutCartas.FillDirection       = Enum.FillDirection.Horizontal
+    layoutCartas.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layoutCartas.VerticalAlignment   = Enum.VerticalAlignment.Center
+    layoutCartas.Padding             = UDim.new(0, 10)
+
+    -- StatusLabel (LayoutOrder = 4)
+    statusLabelMaoDeOnze = Instance.new("TextLabel")
+    statusLabelMaoDeOnze.Name                   = "StatusLabel"
+    statusLabelMaoDeOnze.LayoutOrder            = 4
+    statusLabelMaoDeOnze.Size                   = UDim2.new(1, 0, 0, 20)
+    statusLabelMaoDeOnze.BackgroundTransparency = 1
+    statusLabelMaoDeOnze.Text                   = "Analise o jogo e decida com sua dupla!"
+    statusLabelMaoDeOnze.TextColor3             = TEXTO_SEC
+    statusLabelMaoDeOnze.Font                   = Enum.Font.GothamMedium
+    statusLabelMaoDeOnze.TextSize               = 14
+    statusLabelMaoDeOnze.Parent                 = painelMaoDeOnze
+
+    -- Container de Botões (LayoutOrder = 5)
+    local containerBotoes = Instance.new("Frame")
+    containerBotoes.Name                   = "ContainerBotoes"
+    containerBotoes.LayoutOrder            = 5
+    containerBotoes.Size                   = UDim2.new(1, 0, 0, 44)
+    containerBotoes.BackgroundTransparency = 1
+    containerBotoes.Parent                 = painelMaoDeOnze
+
+    local layoutBotoes = Instance.new("UIListLayout", containerBotoes)
+    layoutBotoes.FillDirection       = Enum.FillDirection.Horizontal
+    layoutBotoes.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layoutBotoes.VerticalAlignment   = Enum.VerticalAlignment.Center
+    layoutBotoes.Padding             = UDim.new(0, 12)
+
+    -- Botão JOGAR
+    btnJogarMaoDeOnze = Instance.new("TextButton")
+    btnJogarMaoDeOnze.Name            = "BtnJogar"
+    btnJogarMaoDeOnze.Size            = UDim2.new(0.48, 0, 1, 0)
+    btnJogarMaoDeOnze.BackgroundColor3 = VERDE
+    btnJogarMaoDeOnze.Text            = "JOGAR (VALE 3)"
+    btnJogarMaoDeOnze.TextColor3      = TEXTO_PRIM
+    btnJogarMaoDeOnze.Font            = Enum.Font.GothamBold
+    btnJogarMaoDeOnze.TextSize        = 14
+    btnJogarMaoDeOnze.AutoButtonColor = true
+    btnJogarMaoDeOnze.Parent          = containerBotoes
+    Instance.new("UICorner", btnJogarMaoDeOnze).CornerRadius = UDim.new(0, 8)
+
+    btnJogarMaoDeOnze.Activated:Connect(function()
+        if statusLabelMaoDeOnze then statusLabelMaoDeOnze.Text = "Decisão enviada..." end
+        btnJogarMaoDeOnze.Active = false
+        btnCorrerMaoDeOnze.Active = false
+        Eventos.GameStatusEvent:FireServer("HandOfElevenDecision", "JOGAR")
+    end)
+
+    -- Botão CORRER
+    btnCorrerMaoDeOnze = Instance.new("TextButton")
+    btnCorrerMaoDeOnze.Name            = "BtnCorrer"
+    btnCorrerMaoDeOnze.Size            = UDim2.new(0.48, 0, 1, 0)
+    btnCorrerMaoDeOnze.BackgroundColor3 = VERMELHO
+    btnCorrerMaoDeOnze.Text            = "CORRER (-1 PT)"
+    btnCorrerMaoDeOnze.TextColor3      = TEXTO_PRIM
+    btnCorrerMaoDeOnze.Font            = Enum.Font.GothamBold
+    btnCorrerMaoDeOnze.TextSize        = 14
+    btnCorrerMaoDeOnze.AutoButtonColor = true
+    btnCorrerMaoDeOnze.Parent          = containerBotoes
+    Instance.new("UICorner", btnCorrerMaoDeOnze).CornerRadius = UDim.new(0, 8)
+
+    btnCorrerMaoDeOnze.Activated:Connect(function()
+        if statusLabelMaoDeOnze then statusLabelMaoDeOnze.Text = "Decisão enviada..." end
+        btnJogarMaoDeOnze.Active = false
+        btnCorrerMaoDeOnze.Active = false
+        Eventos.GameStatusEvent:FireServer("HandOfElevenDecision", "CORRER")
+    end)
+end
+
+function UIManager.MostrarDecisaoMaoDeOnze(dados)
+    if not painelMaoDeOnze or not containerCartasParceiro then return end
+
+    -- Limpa as cartas anteriores mantendo o UIListLayout
+    for _, filho in ipairs(containerCartasParceiro:GetChildren()) do
+        if not filho:IsA("UIListLayout") then
+            filho:Destroy()
+        end
+    end
+
+    local cartasParceiro = (type(dados) == "table" and dados.MaoParceiro) or dados
+
+    if type(cartasParceiro) == "table" then
+        for _, carta in ipairs(cartasParceiro) do
+            if type(carta) == "table" and carta.Value and carta.Suit then
+                local img = Instance.new("ImageLabel")
+                img.Size                   = UDim2.new(0, 80, 0, 115)
+                img.BackgroundTransparency = 1
+                local c = Instance.new("UICorner", img)
+                c.CornerRadius             = UDim.new(0, 6)
+                img.Parent                 = containerCartasParceiro
+
+                CardSettings.AplicarSkinCarta(img, carta.Value, carta.Suit, false, "Padrao")
+            end
+        end
+    end
+
+    if statusLabelMaoDeOnze then
+        statusLabelMaoDeOnze.Text = "Analise o jogo e decida com sua dupla!"
+    end
+    if btnJogarMaoDeOnze then
+        btnJogarMaoDeOnze.Active = true
+    end
+    if btnCorrerMaoDeOnze then
+        btnCorrerMaoDeOnze.Active = true
+    end
+
+    painelMaoDeOnze.Visible = true
+end
+
+function UIManager.OcultarDecisaoMaoDeOnze()
+    if painelMaoDeOnze then
+        painelMaoDeOnze.Visible = false
+    end
+end
+
 function UIManager.MostrarAvisoFuga(texto)
     local lblFuga = Instance.new("TextLabel")
     lblFuga.Size               = UDim2.new(0.8, 0, 0.2, 0)
@@ -742,6 +947,9 @@ function UIManager.DefinirVisibilidadeUIJogo(visivel)
     ScoreUI.DefinirVisibilidade(visivel)
     if btnTruco then btnTruco.Visible = false end
     if painelCorte then painelCorte.Visible = false end
+    if not visivel then
+        UIManager.OcultarDecisaoMaoDeOnze()
+    end
 end
 
 function UIManager.DefinirMeuAssento(nomeAssento) end
@@ -789,6 +997,9 @@ function UIManager.DefinirSentado(s)
 end
 
 function UIManager.ResetTotal()
+    viraAtual = nil
+    imgViraAtual = nil
+    TableUI.DefinirModoLateral(false)
     HandUI.Limpar()
     TableUI.Limpar()
     ScoreUI.DefinirVisibilidade(false)
@@ -797,6 +1008,7 @@ function UIManager.ResetTotal()
     TrucoUI.Ocultar()
     UIManager.OcultarOpcoesJogada()
     UIManager.OcultarMenuCorte()
+    UIManager.OcultarDecisaoMaoDeOnze()
 end
 
 function UIManager.AtualizarTurno(nomeJogador, numQueda)

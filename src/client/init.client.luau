@@ -31,6 +31,7 @@ local function atualizarStatusAssento(estaSentado)
             
             print("Sentei na mesa:", modeloMesa.Name) 
             VisuaisMesa.DefinirMesaAtual(modeloMesa)
+            GerenciadorUI.DefinirMesaAtual(modeloMesa)
             GerenciadorUI.DefinirMeuAssento(nomeAssento)
             
             -- Define a equipe baseada no número da cadeira (Ímpar = A, Par = B)
@@ -42,6 +43,7 @@ local function atualizarStatusAssento(estaSentado)
     else
         -- Remove a referência da mesa quando o jogador levanta
         VisuaisMesa.DefinirMesaAtual(nil)
+        GerenciadorUI.DefinirMesaAtual(nil)
     end
 end
 
@@ -170,6 +172,12 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         
     elseif mensagem == "CUTTING" then
         GerenciadorUI.AtualizarStatus("Aguardando corte...", 0)
+        
+    elseif mensagem == "SHOW_ELEVEN_DECISION" then
+        GerenciadorUI.MostrarDecisaoMaoDeOnze(dados)
+
+    elseif mensagem == "HIDE_ELEVEN_DECISION" then
+        GerenciadorUI.OcultarDecisaoMaoDeOnze()
         
     else
         GerenciadorUI.AtualizarStatus(mensagem, dados)
