@@ -1,6 +1,6 @@
 ---
 name: game-balance-economy
-description: Especificação e invariantes do sistema de economia, catálogo de skins, compras Robux, recompensas por partida e balanceamento de Bots.
+description: Especificação e invariantes do sistema de economia, catálogo de skins, compras Robux, recompensas por partida, ranking e balanceamento de Bots.
 ---
 
 # Skill: Economia, Loja & Balanceamento (`game-balance-economy`)
@@ -24,7 +24,10 @@ Centralizar todas as variáveis de balanceamento do jogo em um diretório único
 4. **[RN-32] Skin Gratuita Inicial**:
    - A skin `"Padrao"` deve ter preço $0$ e vir previamente adicionada ao inventário de qualquer jogador recém-cadastrado.
 5. **[RN-34] Transações Robux (ProcessReceipt)**:
-   - Toda compra via Robux deve retornar `PurchaseGranted` apenas após o crédito seguro dos pontos ou registro da doação, idempotente por `PurchaseId`.
+   - Toda compra via Robux deve retornar `PurchaseGranted` apenas após o crédito seguro dos pontos ou registro de `RobuxGasto` (doações), garantindo rastreamento no ranking de Apoiadores.
+6. **[RN-37 & RN-38] Persistência e Ranking Global (OrderedDataStore)**:
+   - O `DataManager` persiste `Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas` e `SkinEquipada` em `TrucoData_v1`.
+   - O `LeaderboardManager` sincroniza os 3 `OrderedDataStore` globais (`Vitorias`, `Pontos`, `Robux`) via callback `OnStatChanged` e alimenta tanto o modal (`LeaderboardUI`) quanto o quadro físico 3D (`Workspace.LeaderboardBoard`).
 
 ---
 
@@ -34,7 +37,9 @@ Centralizar todas as variáveis de balanceamento do jogo em um diretório único
 - `src/shared/Configs/GameRulesConfig.luau` — Limites temporais e escalonamento de pontos.
 - `src/server/ShopManager.luau` — Validação e processamento de compra/equipar no servidor.
 - `src/server/RobuxManager.luau` — ProcessReceipt de produtos de desenvolvimento e doações.
-- `src/server/DataManager.luau` — Persistência no DataStore (`Pontos`, `SkinsCompradas`, `SkinEquipada`).
+- `src/server/DataManager.luau` — Persistência no DataStore (`TrucoData_v1`) e disparo de `OnStatChanged`.
+- `src/server/LeaderboardManager.luau` — `OrderedDataStore` (Vitórias, Pontos, Apoiadores) e quadro físico 3D.
+- `src/client/UI/LeaderboardUI.luau` — Modal de Ranking global com abas e card de desempenho próprio.
 
 ---
 

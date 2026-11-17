@@ -28,19 +28,31 @@ Gerenciar o ciclo de vida completo de uma partida de Truco Paulista no servidor 
    - Cartas jogadas fora de turno são descartadas silenciosamente no servidor.
 5. **[RN-27] Votação em Dupla Humana**:
    - Quando a equipe desafiada for composta por dois jogadores humanos, a ação ("Aceitar", "Correr", "Aumentar") só é executada quando ambos os jogadores emitirem o mesmo voto.
+6. **[RN-28 & RN-29] Decisão da Mão de Onze (`SHOW_ELEVEN_DECISION`)**:
+   - Quando uma equipe humana atinge 11 pontos, `RoundManager:IniciarMaoDeOnze()` envia suas próprias cartas (`DealCards`) + cartas do parceiro (`SHOW_ELEVEN_DECISION`), exibindo o modal `PainelMaoDeOnze` no cliente (`UIManager.luau`) com timeout de segurança de 20s no servidor. `DecidirMaoDeOnze` valida no servidor que apenas jogadores de `EquipeMaoDeOnze` podem decidir.
+7. **Proteção de Concorrência (`IDRodada`, `CorteFoiRealizado`, `IDPartida`)**:
+   - `RoundManager` invalida timeouts de corte antigos com `CorteFoiRealizado` + token `IDRodada`, e `Match` protege `task.wait` pós-mão com `IDPartida`.
 
 ---
 
-## 3. Arquivos de Código Pertencentes a este Módulo
+## 3. Protocolo de Rede (`ReplicatedStorage.Events`)
+
+- **Cliente → Servidor**: `PlayCardEvent`, `TrucoEvent`, `GameStatusEvent` (`CutAction` / `HandOfElevenDecision`), `SignalEvent`, `ShopActionEvent`, `AdminActionEvent`, `GetLeaderboardData` (`RemoteFunction`).
+- **Servidor → Cliente**: `DealCards`, `UpdateTurnEvent`, `CardPlayedOnTable`, `RequestAction`, `SignalEvent`, `SyncDataEvent`, `GameStatusEvent` (mensagens de estado via `EventBroadcaster`).
+
+---
+
+## 4. Arquivos de Código Pertencentes a este Módulo
 - `src/server/Classes/Match.luau` — Instância central da partida, gerenciador de assentos e placar.
 - `src/server/Classes/RoundManager.luau` — Gerenciador de turnos, baralho e avaliação de quedas.
 - `src/server/Classes/TrucoHandler.luau` — Máquina de estados de desafio, escalonamento e timeout.
 - `src/server/Classes/EventBroadcaster.luau` — Emissão de RemoteEvents seguros do servidor para os clientes.
 - `src/server/TableManager.luau` — Roteamento das mesas físicas e eventos de rede.
+- `src/shared/Configs/GameRulesConfig.luau` — Limites temporais, estados e constantes da partida.
 
 ---
 
-## 4. Script de Validação e Testes
+## 5. Script de Validação e Testes
 Valida a lógica da máquina de estados e escalonamento de Truco de forma determinística:
 
 - **Caminho**: `.gemini/skills/truco-match-flow/tests/test_match_flow.py`

@@ -7,7 +7,17 @@
 
 ## [Não Lançado]
 
-### Implementado
+### Implementado / Corrigido
+- 🧹 **Cleanup no Studio & Mapeamento de Mesas ([Issue #12](https://github.com/nicolasbelisario/Truco/issues/12))**:
+  - Mesas PvE em `Workspace.MesasFolder` renomeadas para nomes únicos (`MesaPvE_Solo_1..2`, `MesaPvE_Dupla_1..2`, `MesaPvE_Trio_1..2`) com `Attribute` `TipoMesa` (`PvP`, `MesaPvE_Solo`, `MesaPvE_Dupla`, `MesaPvE_Trio`).
+  - `TableManager.luau` atualizado para resolver `CONFIG_BOTS` por `Attribute("TipoMesa")`, nome exato ou prefixo (retrocompatível).
+  - `Workspace.TestBot` órfão removido e `StarterGui.ScreenGui.TextLabel` (`PRÉ-ALPHA`) ajustado para `AnchorPoint (1, 1)`, `Position (1, -16, 1, -12)` e `TextScaled = true`.
+  - Seção `Contrato do Mapa 3D` em `docs/wiki/ARCHITECTURE.md` e auditoria em `docs/wiki/ROBLOX_GROWTH_ROADMAP.md` atualizadas.
+- 🛠️ **Correção dos 3 Bugs Críticos (`D-01`, `D-02`, `D-03` / Issue #7) & Auditoria SDD**:
+  - **Mão de Onze para Humanos (`D-01`)**: Adicionados handlers `SHOW_ELEVEN_DECISION` / `HIDE_ELEVEN_DECISION` em `init.client.luau`, modal completo `PainelMaoDeOnze` em `UIManager.luau`, validação anti-cheat por `EquipeMaoDeOnze` e timeout de segurança de 20s em `RoundManager.luau`.
+  - **Regra de Canga / Empate entre Parceiros (`D-02`)**: `RoundManager:JogarCarta()` envia `Team` em `CartasNaMesa`; `RuleManager.ObterVencedorRodada()` mantém a vitória da dupla quando parceiros empatam na maior carta e retorna `"DRAW"` se todas as 4 cartas forem cobertas (`maiorForca <= 0`).
+  - **Race Condition de Corte e Delays (`D-03` / Issue #7)**: Adicionados `CorteFoiRealizado` e tokens `IDRodada` (`RoundManager.luau`) e `IDPartida` (`Match.luau`) protegendo `task.delay` e `task.wait`.
+  - **Documentação SDD & Testes**: Todos os Use Cases de `UC_INDEX.md` criados/atualizados, `.gemini/GEMINI.md` e `docs/wiki/` sincronizados com o código real e Studio, `ADR-002` e `ROBLOX_GROWTH_ROADMAP.md` adicionados, e suítes Python das Skills expandidas (7 testes em `test_rules.py`, 12 em `test_match_flow.py`, 3 em `validate_configs.py`).
 - 🏆 **Sistema de Ranking / Leaderboard Global ([Issue #3](https://github.com/nicolasbelisario/Truco/issues))**:
   - `LeaderboardManager.luau` com 3 `OrderedDataStore` (Vitórias, Pontos, Apoiadores/Robux).
   - Atualização do schema em `DataManager.luau` com persistência de `Vitorias`, `Derrotas`, `PartidasJogadas` e `RobuxGasto`.
@@ -17,17 +27,20 @@
   - RemoteFunction `GetLeaderboardData` sincronizada via `default.project.json`.
 
 ### Planejado
-- Sistema de IA dos Bots com estratégia real ([Issue #1](https://github.com/nicolasbelisario/Truco/issues))
-- Matchmaking / Sala Pública PvP ([Issue #2](https://github.com/nicolasbelisario/Truco/issues))
-- Emotes e Chat de Mesa expandido ([Issue #4](https://github.com/nicolasbelisario/Truco/issues))
-- Sistema de Conquistas / Achievements ([Issue #5](https://github.com/nicolasbelisario/Truco/issues))
-- Modo Truco Mineiro / Variantes de Regras ([Issue #6](https://github.com/nicolasbelisario/Truco/issues))
-- Tutorial Interativo In-Game ([Issue #8](https://github.com/nicolasbelisario/Truco/issues))
-- Partidas Privadas com Convite de Amigos ([Issue #9](https://github.com/nicolasbelisario/Truco/issues))
-- Melhorias de Áudio — SFX e Trilha Sonora ([Issue #10](https://github.com/nicolasbelisario/Truco/issues))
+- Sistema de IA dos Bots com estratégia tática real ([Issue #1](https://github.com/nicolasbelisario/Truco/issues/1))
+- Onboarding rápido ("Jogar Agora"), Matchmaking PvP, ProximityPrompts e Bot Anti-Abandono ([Issue #2](https://github.com/nicolasbelisario/Truco/issues/2))
+- Sinais clássicos de Truco, chat rápido seguro e animações de mesa ([Issue #4](https://github.com/nicolasbelisario/Truco/issues/4))
+- Meta-Progressão: Conquistas, Missões Diárias, Daily Login e Win Streak ([Issue #5](https://github.com/nicolasbelisario/Truco/issues/5))
+- Modo Truco Mineiro / Variantes de Regras ([Issue #6](https://github.com/nicolasbelisario/Truco/issues/6))
+- Onboarding: Destaque de Manilhas na mão e Tutorial na 1ª sessão ([Issue #8](https://github.com/nicolasbelisario/Truco/issues/8))
+- Partidas Privadas com Convite de Amigos ([Issue #9](https://github.com/nicolasbelisario/Truco/issues/9))
+- Controle unificado de BGM/SFX (`D-04`), sliders de volume e novos SFX ([Issue #10](https://github.com/nicolasbelisario/Truco/issues/10))
+- Imersão Tabletop 3D: unificar `TableUI`/`TableVisuals`, monte/Vira 3D e mão em leque ([Issue #13](https://github.com/nicolasbelisario/Truco/issues/13))
+- Redesign ambiental do Lobby (Boteco/Praça Paulista) e Pódio 3D Top 3 ([Issue #14](https://github.com/nicolasbelisario/Truco/issues/14))
+- Novos cosméticos (Card Slam VFX, Títulos) e VIP Gamepass ([Issue #15](https://github.com/nicolasbelisario/Truco/issues/15))
 
-### Bug Fixes Planejados
-- Timeout do Corte com condição de corrida ([Issue #7](https://github.com/nicolasbelisario/Truco/issues))
+### Bug Fixes & Ajustes de Cena Planejados
+- `CameraManager` não aplica zoom de tensão em Bots (`D-05`) e Vira usa skin fixa ([Issue #11](https://github.com/nicolasbelisario/Truco/issues/11))
 
 ## [Skills & MCP Integration] — 2026-10-16
 

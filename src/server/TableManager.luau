@@ -6,18 +6,42 @@ local GerenciadorMesas = {}
 local listaMesas = {} -- Associa o Modelo 3D à Classe Partida
 local jogadorParaMesa = {} -- Associa o Jogador à Partida que ele está jogando
 
--- CONFIGURAÇÃO DOS BOTS POR NOME DA MESA (PvE)
+-- CONFIGURAÇÃO DOS BOTS POR TIPO (Attribute "TipoMesa") OU PREFIXO DO NOME DA MESA (PvE)
 local CONFIG_BOTS = {
     ["MesaPvE_Solo"] = {2, 3, 4}, -- 1 Humano vs 3 Bots
     ["MesaPvE_Dupla"] = {2, 4},   -- 2 Humanos vs 2 Bots
     ["MesaPvE_Trio"] = {4},       -- 3 Humanos vs 1 Bot
 }
 
+-- Resolve a configuração de cadeiras de bots por Attribute "TipoMesa" ou nome/prefixo (retrocompatível)
+local function resolverCadeirasBot(modeloMesa)
+    local tipoMesa = modeloMesa:GetAttribute("TipoMesa")
+    if type(tipoMesa) == "string" and CONFIG_BOTS[tipoMesa] then
+        return CONFIG_BOTS[tipoMesa]
+    end
+
+    local nomeMesa = modeloMesa.Name
+    if CONFIG_BOTS[nomeMesa] then
+        return CONFIG_BOTS[nomeMesa]
+    end
+
+    for prefixo, cadeiras in pairs(CONFIG_BOTS) do
+        if nomeMesa:sub(1, #prefixo) == prefixo then
+            local proximoChar = nomeMesa:sub(#prefixo + 1, #prefixo + 1)
+            if proximoChar == "" or proximoChar == "_" or proximoChar:match("%d") then
+                return cadeiras
+            end
+        end
+    end
+
+    return {}
+end
+
 -- [MÉTODO] Lê todas as mesas do mapa e cria as instâncias lógicas
 function GerenciadorMesas.Inicializar(pasta)
     for _, modeloMesa in ipairs(pasta:GetChildren()) do
         
-        local cadeirasBot = CONFIG_BOTS[modeloMesa.Name] or {}
+        local cadeirasBot = resolverCadeirasBot(modeloMesa)
         local partida = Partida.nova(modeloMesa, cadeirasBot)
         
         listaMesas[modeloMesa] = partida

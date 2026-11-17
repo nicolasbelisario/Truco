@@ -86,7 +86,7 @@ function TutorialUI.Inicializar(pai, containerMenu)
         end)
 
         btnTutorialAbrir.Activated:Connect(function()
-            TutorialUI.Mostrar(true)
+            TutorialUI.Alternar()
         end)
     end
 
@@ -221,6 +221,11 @@ function TutorialUI.Mostrar(abrir)
     else
         menuTutorial.Visible = false
     end
+end
+
+function TutorialUI.Alternar()
+    if not menuTutorial then return end
+    TutorialUI.Mostrar(not menuTutorial.Visible)
 end
 
 return TutorialUI

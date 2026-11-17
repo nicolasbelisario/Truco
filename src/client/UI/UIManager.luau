@@ -25,6 +25,7 @@ local ShopUI       = require(script.Parent.ShopUI)
 local TutorialUI   = require(script.Parent.TutorialUI)
 local ScoreUI      = require(script.Parent.ScoreUI)
 local SoundManager = require(script.Parent.SoundManager)
+local AudioUI      = require(script.Parent.AudioUI)
 local CameraManager = require(script.Parent.CameraManager)
 local LeaderboardUI = require(script.Parent.LeaderboardUI)
 
@@ -53,9 +54,8 @@ local dadosJogador = { SkinEquipada = "Padrao" }
 local viraAtual = nil
 local imgViraAtual = nil
 
--- Barra de menu principal (topo-esquerdo: 🏆 Ranking, 🛒 Loja, ❓ Ajuda, 🔊 Som)
+-- Barra de menu principal (topo-esquerdo: 🏆 Ranking, 🛒 Loja, ❓ Ajuda, 🔊 Áudio)
 local barraMenuPrincipal
-local btnMuteGlobal
 
 function UIManager.Inicializar()
     local GuiService = game:GetService("GuiService")
@@ -104,11 +104,12 @@ function UIManager.Inicializar()
 
     ScoreUI.Inicializar(UIManager._CriarElementosScore())
 
-    -- Inicializa módulos de menu dentro da barra unificada
+    -- Inicializa módulos de áudio e menu dentro da barra unificada
+    SoundManager.Inicializar()
     LeaderboardUI.Inicializar(painelTela, barraMenuPrincipal)
     ShopUI.Inicializar(painelTela, barraMenuPrincipal)
     TutorialUI.Inicializar(painelTela, barraMenuPrincipal)
-    UIManager._CriarBtnMuteGlobal(barraMenuPrincipal)
+    AudioUI.Inicializar(painelTela, barraMenuPrincipal, SoundManager)
 
     UIManager.LeaderboardUI = LeaderboardUI
 
@@ -211,6 +212,7 @@ function UIManager.AdicionarCartaMao(card)         HandUI.AdicionarCarta(card) e
 function UIManager.AdicionarCartaJogadaUI(...)     TableUI.AdicionarCarta(...) end
 function UIManager.LimparMesa()                    TableUI.Limpar() end
 function UIManager.TocarSom(nome)                  SoundManager.Tocar(nome) end
+function UIManager.DefinirModoTensao(ativo)        SoundManager.DefinirModoTensao(ativo) end
 function UIManager.DefinirMesaAtual(modeloMesa)    CameraManager.DefinirMesaAtual(modeloMesa) end
 function UIManager.ResetarCamera()                 CameraManager.Resetar() end
 function UIManager.MostrarDesafioTruco(v, q, t)   TableUI.DefinirModoLateral(true); TrucoUI.Mostrar(v, q, t) end
@@ -370,53 +372,6 @@ function UIManager._CriarBtnTruco()
     btnTruco.Activated:Connect(function()
         Eventos.TrucoEvent:FireServer("Request")
         UIManager.PermitirTruco(false)
-    end)
-end
-
--- ==========================================
--- BOTÃO MUTE GLOBAL (NA BARRA DO TOPO)
--- ==========================================
-
-function UIManager._CriarBtnMuteGlobal(containerMenu)
-    local TweenService = game:GetService("TweenService")
-    btnMuteGlobal = Instance.new("TextButton", containerMenu)
-    btnMuteGlobal.Name            = "BtnMuteGlobal"
-    btnMuteGlobal.Size            = UDim2.new(0, 46, 0, 46)
-    btnMuteGlobal.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-    btnMuteGlobal.BackgroundTransparency = 0.25
-    btnMuteGlobal.Text            = SoundManager.EstaMutado() and "🔇" or "🔊"
-    btnMuteGlobal.TextSize        = 22
-    btnMuteGlobal.TextColor3      = TEXTO_PRIM
-    btnMuteGlobal.Font            = Enum.Font.GothamBlack
-    btnMuteGlobal.AutoButtonColor = true
-    btnMuteGlobal.LayoutOrder     = 4
-    btnMuteGlobal.ZIndex          = 41
-    Instance.new("UICorner", btnMuteGlobal).CornerRadius = UDim.new(1, 0)
-
-    local borda = Instance.new("UIStroke", btnMuteGlobal)
-    borda.Thickness    = 1.5
-    borda.Color        = Color3.new(1, 1, 1)
-    borda.Transparency = 0.8
-
-    btnMuteGlobal.MouseEnter:Connect(function()
-        TweenService:Create(btnMuteGlobal, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.05,
-            BackgroundColor3 = Color3.fromRGB(38, 38, 46)
-        }):Play()
-    end)
-    btnMuteGlobal.MouseLeave:Connect(function()
-        TweenService:Create(btnMuteGlobal, TweenInfo.new(0.2), {
-            BackgroundTransparency = 0.25,
-            BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-        }):Play()
-    end)
-
-    btnMuteGlobal.Activated:Connect(function()
-        local mutado = SoundManager.AlternarMute()
-        btnMuteGlobal.Text = mutado and "🔇" or "🔊"
-        btnMuteGlobal.BackgroundColor3 = mutado
-            and Color3.fromRGB(70, 25, 25)
-            or  Color3.fromRGB(24, 24, 28)
     end)
 end
 
@@ -999,6 +954,7 @@ end
 function UIManager.ResetTotal()
     viraAtual = nil
     imgViraAtual = nil
+    SoundManager.DefinirModoTensao(false)
     TableUI.DefinirModoLateral(false)
     HandUI.Limpar()
     TableUI.Limpar()

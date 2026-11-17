@@ -17,26 +17,32 @@ end
 -- [MÉTODO] Avalia todas as 4 cartas jogadas e devolve quem ganhou
 function GerenciadorRegras.ObterVencedorRodada(cartasJogadas)
     local vencedor = nil
-    local maiorForca = -1
+    local equipeMaior = nil
+    local maiorForca = 0
     local empatou = false 
 
-    for _, jogada in pairs(cartasJogadas) do
-        -- A 'jogada' agora contém o objeto da carta completo
+    for _, jogada in ipairs(cartasJogadas) do
         local forcaAtual = GerenciadorRegras.CalcularForcaCarta(jogada)
 
         if forcaAtual > maiorForca then
             maiorForca = forcaAtual
             vencedor = jogada.Player
+            equipeMaior = jogada.Team
             empatou = false
         elseif forcaAtual == maiorForca and maiorForca > 0 then
-            -- Empate só acontece se a força for a mesma e maior que zero (não pode empatar com carta virada)
-            empatou = true
-            -- Em caso de empate, o vencedor é temporariamente nulo até que todas as cartas sejam verificadas.
-            -- A lógica de desempate (canga) é tratada no RoundManager com o histórico de quedas.
+            -- Se dois parceiros da mesma equipe empatarem na maior carta, NÃO é empate (canga):
+            -- a equipe deles continua vencendo com o primeiro parceiro que jogou.
+            if not (jogada.Team ~= nil and equipeMaior ~= nil and jogada.Team == equipeMaior) then
+                empatou = true
+            end
         end
     end
 
-    if empatou then return "DRAW" else return vencedor end
+    if maiorForca <= 0 or empatou then
+        return "DRAW"
+    else
+        return vencedor
+    end
 end
 
 return GerenciadorRegras

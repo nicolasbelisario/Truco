@@ -30,6 +30,7 @@ function Partida.nova(modeloMesa, listaAssentosBots)
     self.Estado = "WAITING"
     self.Assentos = {}
     self.Placar = { TeamA = 0, TeamB = 0 }
+    self.IDPartida = 1
 
     -- [CORREÇÃO 3] Mantém o contexto de self encapsulado corretamente:
     self.VerificarBot = function(jog) return self:EBot(jog) end
@@ -160,6 +161,7 @@ end
     sorteia o primeiro distribuidor (dealer) e inicia a primeira rodada.
 ]]
 function Partida:ComecarJogo()
+    self.IDPartida = (self.IDPartida or 0) + 1
     self:DefinirPuloJogadores(false)
     self.Placar = {TeamA = 0, TeamB = 0}
     self.RoundManager.IndexDistribuidor = math.random(1, 4)
@@ -248,6 +250,7 @@ end
     @param motivo string: Mensagem a ser exibida como motivo do fim da partida.
 ]]
 function Partida:ResetarPartida(motivo)
+    self.IDPartida = (self.IDPartida or 0) + 1
     self:DefinirPuloJogadores(true)
     EventBroadcaster.ParaTodos(self.Assentos, "HIDE_GAME_UI", 0, self.VerificarBot)
     EventBroadcaster.ParaTodos(self.Assentos, "HIDE_SCOREBOARD", 0, self.VerificarBot)
@@ -356,7 +359,9 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
     
     EventBroadcaster.ParaTodos(self.Assentos, "UPDATE_SCORE", self.Placar, self.VerificarBot)
     
+    local idPartidaAtual = self.IDPartida
     task.wait(3)
+    if self.IDPartida ~= idPartidaAtual or self.Estado ~= "SCORING" then return end
     
     local ptsMaximo = GameRulesConfig.PONTOS_VITORIA_PARTIDA
     if self.Placar.TeamA >= ptsMaximo or self.Placar.TeamB >= ptsMaximo then
@@ -382,6 +387,7 @@ function Partida:FinalizarMao(equipeVencedora, valorRodada)
         end
         
         task.wait(GameRulesConfig.Tempos.EsperaFinalizacaoPartida)
+        if self.IDPartida ~= idPartidaAtual then return end
         self:ResetarPartida("Nova Partida")
     else
 

@@ -5,7 +5,9 @@ local jogadorLocal = Players.LocalPlayer
 
 -- Módulos do Cliente
 local GerenciadorUI = require(script:WaitForChild("UI"):WaitForChild("UIManager"))
+local SoundManager = require(script:WaitForChild("UI"):WaitForChild("SoundManager"))
 local VisuaisMesa = require(script:WaitForChild("TableVisuals"))
+local CardSettings = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("CardSettings"))
 local Eventos = ReplicatedStorage:WaitForChild("Events")
 
 -- Variáveis de Estado do Jogador
@@ -14,9 +16,14 @@ local minhaEquipe = "A"
 local ultimoTempoEmote = 0
 local TEMPO_ESPERA_EMOTE = 3
 local trucoPendente = false
+local placarAtual = { meus = 0, inimigos = 0 }
+local quedasAnteriores = { nossas = 0, inimigas = 0 }
+local valorManilhaAtual = nil
+local ultimoSomResultado = 0
 
--- Inicializa a Interface de Usuário
+-- Inicializa a Interface de Usuário e Áudio Centralizado (D-04)
 GerenciadorUI.Inicializar()
+SoundManager.Inicializar()
 
 -- [MÉTODO] Atualiza o status de sentar do jogador para registrar em qual mesa ele está
 local function atualizarStatusAssento(estaSentado)
@@ -92,6 +99,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.OcultarDesafioTruco()
         GerenciadorUI.ResetarCamera()
         GerenciadorUI.AtualizarStatus("TRUCO ACEITO! Vale " .. dados, 0)
+        GerenciadorUI.TocarSom("TrucoAccept")
 
     elseif mensagem == "TRUCO_FUGIU" then
         trucoPendente = false
@@ -100,8 +108,8 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         
         -- O servidor nos enviou os nomes de quem fugiu na variável "dados"
         GerenciadorUI.MostrarAvisoFuga(dados .. " correram!")
-        
-        -- Se quiser, pode colocar um som aqui depois, tipo: GerenciadorUI.TocarSom("Galinha")
+        GerenciadorUI.TocarSom("TrucoFlee")
+        ultimoSomResultado = tick()
 
     elseif mensagem == "PARTNER_VOTED" then
         GerenciadorUI.AtualizarStatusDesafio("Parceiro quer: " .. string.upper(dados))
@@ -120,6 +128,9 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
     elseif mensagem == "DEALING" then
         GerenciadorUI.OcultarMenuCorte()
         GerenciadorUI.TocarSom("Shuffle")
+        local emMaoEspecial = (placarAtual.meus == 11 or placarAtual.inimigos == 11)
+            and placarAtual.meus < 12 and placarAtual.inimigos < 12
+        GerenciadorUI.DefinirModoTensao(emMaoEspecial)
 
     elseif mensagem == "TEAM_A_WON_HAND" or mensagem == "TEAM_B_WON_HAND" or mensagem == "DRAW_HAND" then
         trucoPendente = false 
@@ -135,12 +146,39 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
             textoVencedor = (mensagem == "TEAM_A_WON_HAND") and "DUPLA A" or "DUPLA B"
         end
         
+        if mensagem ~= "DRAW_HAND" and (tick() - ultimoSomResultado) > 0.5 then
+            local equipeVencedoraMao = (mensagem == "TEAM_A_WON_HAND") and "A" or "B"
+            GerenciadorUI.TocarSom((equipeVencedoraMao == minhaEquipe) and "RoundWin" or "RoundLose")
+            ultimoSomResultado = tick()
+        end
+
         GerenciadorUI.MostrarVencedorRodada(textoVencedor)
 
     -- --- BLOCO DE ATUALIZAÇÃO DE MESA ---
     elseif mensagem == "CLEAR_TABLE" then
         local minhasQuedas = (minhaEquipe == "A") and dados.TeamA or dados.TeamB
         local quedasInimigas = (minhaEquipe == "A") and dados.TeamB or dados.TeamA
+
+        local vencedorQueda = dados.Winner
+        if not vencedorQueda then
+            if minhasQuedas > quedasAnteriores.nossas then
+                vencedorQueda = minhaEquipe
+            elseif quedasInimigas > quedasAnteriores.inimigas then
+                vencedorQueda = (minhaEquipe == "A") and "B" or "A"
+            end
+        end
+
+        if vencedorQueda == minhaEquipe then
+            GerenciadorUI.TocarSom("RoundWin")
+            ultimoSomResultado = tick()
+        elseif vencedorQueda == "A" or vencedorQueda == "B" then
+            GerenciadorUI.TocarSom("RoundLose")
+            ultimoSomResultado = tick()
+        end
+
+        quedasAnteriores.nossas = minhasQuedas
+        quedasAnteriores.inimigas = quedasInimigas
+
         GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, minhasQuedas, quedasInimigas)
         
         GerenciadorUI.LimparMesa()
@@ -149,6 +187,11 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
     elseif mensagem == "UPDATE_SCORE" then
         local meusPontos = (minhaEquipe == "A") and dados.TeamA or dados.TeamB
         local pontosInimigos = (minhaEquipe == "A") and dados.TeamB or dados.TeamA
+        placarAtual.meus = meusPontos
+        placarAtual.inimigos = pontosInimigos
+        if meusPontos == 0 and pontosInimigos == 0 then
+            GerenciadorUI.DefinirModoTensao(false)
+        end
         GerenciadorUI.AtualizarPlacar(meusPontos, pontosInimigos)
         
     elseif mensagem == "UPDATE_ROUND_VALUE" then
@@ -161,20 +204,29 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.OcultarPlacar()
         
     elseif mensagem == "HIDE_GAME_UI" then
+        quedasAnteriores = { nossas = 0, inimigas = 0 }
+        valorManilhaAtual = nil
+        GerenciadorUI.DefinirModoTensao(false)
         GerenciadorUI.ResetTotal()
 
     elseif mensagem == "SHOW_GAME_UI" then
         GerenciadorUI.DefinirVisibilidadeUIJogo(true)
 
     elseif mensagem == "MATCH_WON" then
+        GerenciadorUI.DefinirModoTensao(false)
         GerenciadorUI.MostrarVencedorPartida(dados)
-        GerenciadorUI.TocarSom("Victory")
+        if placarAtual.meus >= placarAtual.inimigos then
+            GerenciadorUI.TocarSom("Victory")
+        else
+            GerenciadorUI.TocarSom("Defeat")
+        end
         
     elseif mensagem == "CUTTING" then
         GerenciadorUI.AtualizarStatus("Aguardando corte...", 0)
         
     elseif mensagem == "SHOW_ELEVEN_DECISION" then
         GerenciadorUI.MostrarDecisaoMaoDeOnze(dados)
+        GerenciadorUI.DefinirModoTensao(true)
 
     elseif mensagem == "HIDE_ELEVEN_DECISION" then
         GerenciadorUI.OcultarDecisaoMaoDeOnze()
@@ -189,6 +241,18 @@ end)
 -- ==========================================
 Eventos.DealCards.OnClientEvent:Connect(function(mao, vira, nomeParceiro)
     if nomeParceiro then parceiroAtual = nomeParceiro end
+    quedasAnteriores = { nossas = 0, inimigas = 0 }
+
+    local idxVira = vira and table.find(CardSettings.Values, vira.Value)
+    if idxVira then
+        valorManilhaAtual = CardSettings.Values[(idxVira % #CardSettings.Values) + 1]
+    else
+        valorManilhaAtual = nil
+    end
+
+    local emMaoEspecial = (placarAtual.meus == 11 or placarAtual.inimigos == 11)
+        and placarAtual.meus < 12 and placarAtual.inimigos < 12
+    GerenciadorUI.DefinirModoTensao(emMaoEspecial)
     
     GerenciadorUI.LimparMao() 
     GerenciadorUI.LimparMesa()
@@ -209,7 +273,11 @@ end)
 Eventos.CardPlayedOnTable.OnClientEvent:Connect(function(nomeJogador, valor, naipe, estaEscondida, nomeSkin)
     -- Passa a skin pra UI 2D
     GerenciadorUI.AdicionarCartaJogadaUI(nomeJogador, valor, naipe, estaEscondida, nomeSkin)
-    GerenciadorUI.TocarSom("CardPlay")
+    if not estaEscondida and valorManilhaAtual and valor == valorManilhaAtual then
+        GerenciadorUI.TocarSom("ZapImpact")
+    else
+        GerenciadorUI.TocarSom("CardPlay")
+    end
     
     -- Passa a skin pra Mesa 3D
     local jogador = Players:FindFirstChild(nomeJogador)
@@ -253,35 +321,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
--- ==========================================
--- SISTEMA DE MÚSICA DE FUNDO (BGM)
--- ==========================================
-local SoundService = game:GetService("SoundService")
-
-local playlist = {
-    "rbxassetid://1845341094", "rbxassetid://1848354536", 
-    "rbxassetid://1837429944", "rbxassetid://9043887091", 
-    "rbxassetid://1838457617"
-}
-
-local objetoMusica = Instance.new("Sound")
-objetoMusica.Name = "BackgroundMusic"
-objetoMusica.Parent = SoundService
-objetoMusica.Volume = 0.3 
-objetoMusica.Looped = false 
-
-local function tocarProximaMusica()
-    local idAleatorio = playlist[math.random(1, #playlist)]
-    objetoMusica.SoundId = idAleatorio
-    
-    if not objetoMusica.IsLoaded then
-        objetoMusica.Loaded:Wait()
-    end
-    objetoMusica:Play()
-end
-
-objetoMusica.Ended:Connect(tocarProximaMusica)
-task.spawn(tocarProximaMusica)
+-- BGM e SFX centralizados e gerenciados por SoundManager (D-04 / RN-16)
 
 -- ==========================================
 -- SISTEMA DE ZONA DO TUTORIAL

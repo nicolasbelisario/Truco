@@ -2,14 +2,14 @@
 
 **Ator Principal**: Jogador, Bot  
 **Pré-condições**: Estado == `PLAYING`, `TrucoAtivo == true`, valor atual < 12  
-**Regras de Negócio**: RN-10, RN-11, RN-22, RN-23, RN-24, RN-26  
+**Regras de Negócio**: RN-10, RN-11, RN-12, RN-22, RN-23, RN-26  
 
 ---
 
 ## Fluxo Principal
 
 ```
-1. Jogador clica no botão de Truco (ou Bot decide pedir)
+1. Jogador clica no botão de Truco (ou Bot decide pedir via BotConfig)
 2. Cliente dispara TrucoEvent("Request")
 3. Servidor → TrucoHandler:ProcessarRequest(jogador)
 4. Servidor valida:
@@ -17,10 +17,10 @@
    b. AguardandoResposta == false (sem pedido em aberto)
    c. EquipePediu != equipe do jogador (mesma equipe não pede duas vezes)
    d. Próximo valor (prox) <= 12
-5. Estado atualizado: AguardandoResposta=true, EquipePediu=equipe, IDDesafio++
+5. Estado atualizado: AguardandoResposta = true, EquipePediu = equipe, ValorPendente = prox, IDDesafio += 1
 6. EventBroadcaster emite TRUCO_CALLED(prox) para todos
-7. TrucoHandler._PedirResposta() notifica a equipe desafiada
-8. Timer de 15s inicia (RN-26) — se expirar, equipe automaticamente corre
+7. TrucoHandler:_PedirResposta() envia RequestAction("TrucoChallenge") à equipe desafiada
+8. Timer de 15s (GameRulesConfig.Tempos.LimiteRespostaTruco) inicia (RN-26)
 ```
 
 ## Escalonamento de Valores
@@ -36,19 +36,20 @@
 ## Fluxos Alternativos
 
 ### FA-1: Mão de Onze ou Ferro ativa
-- Passo 4a falha → ação ignorada (TrucoAtivo == false)
+- Passo 4a falha → ação ignorada (`TrucoAtivo == false`).
 
 ### FA-2: Bot pede Truco
-- Servidor chama `Bot:JogarTurno()` que decide com 10% de chance (lógica atual)
-- Futuro: avaliar força da mão ([Issue #1](https://github.com/nicolasbelisario/Truco/issues))
+- `Bot:JogarTurno()` decide pedir quando `valorMao == 1` com probabilidade `BotConfig.Dificuldades[dificuldade].ChanceTrucoMaoBase` (10% na dificuldade `Normal`).
+- Futuro: avaliar força real da mão ([Issue #1](https://github.com/nicolasbelisario/Truco/issues)).
 
 ### FA-3: Timeout sem resposta (15s)
-- TrucoHandler emite `TRUCO_TIMEOUT` para todos
-- `_Resolver(false, true)` — equipe desafiada corre automaticamente
+- Se `IDDesafio` permanecer igual após `LimiteRespostaTruco`, `TrucoHandler` emite `TRUCO_TIMEOUT` e chama `_Resolver(false, true)` (equipe desafiada corre automaticamente).
 
 ---
 
 ## Implementação
 
-- [`TrucoHandler:ProcessarRequest()`](../../src/server/Classes/TrucoHandler.luau#L47-L65)
-- [`TrucoHandler:_PedirResposta()`](../../src/server/Classes/TrucoHandler.luau#L144-L177)
+- [`TrucoHandler:ProcessarRequest()`](../../src/server/Classes/TrucoHandler.luau#L50-L68)
+- [`TrucoHandler:_PedirResposta()`](../../src/server/Classes/TrucoHandler.luau#L147-L181)
+- [`GameRulesConfig.luau`](../../src/shared/Configs/GameRulesConfig.luau)
+- [`BotConfig.luau`](../../src/shared/Configs/BotConfig.luau)

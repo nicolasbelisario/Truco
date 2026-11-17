@@ -30,22 +30,32 @@ def calcular_forca_carta(valor: str, naipe: str, vira: str, escondida: bool = Fa
 
 def determinar_vencedor_queda(cartas_jogadas, vira: str):
     """
-    cartas_jogadas: lista de tuplas (jogador, valor, naipe, escondida)
+    cartas_jogadas: lista de tuplas (jogador, equipe, valor, naipe, escondida)
+    ou (jogador, valor, naipe, escondida) para compatibilidade retroativa.
     """
-    maior_forca = -1
+    maior_forca = 0
     vencedor = None
+    equipe_maior = None
     empatou = False
 
-    for jogador, valor, naipe, escondida in cartas_jogadas:
+    for item in cartas_jogadas:
+        if len(item) == 5:
+            jogador, equipe, valor, naipe, escondida = item
+        else:
+            jogador, valor, naipe, escondida = item
+            equipe = None
+
         forca = calcular_forca_carta(valor, naipe, vira, escondida)
         if forca > maior_forca:
             maior_forca = forca
             vencedor = jogador
+            equipe_maior = equipe
             empatou = False
-        elif forca == maior_forca and maiorForca > 0:
-            empatou = True
+        elif forca == maior_forca and maior_forca > 0:
+            if not (equipe is not None and equipe_maior is not None and equipe == equipe_maior):
+                empatou = True
 
-    if empatou:
+    if maior_forca <= 0 or empatou:
         return "DRAW"
     return vencedor
 
@@ -105,6 +115,31 @@ class TestTrucoCoreRules(unittest.TestCase):
             elif f == maior_forca:
                 empatou = True
         self.assertTrue(empatou)
+        self.assertEqual(determinar_vencedor_queda(jogadas, vira), "DRAW")
+
+    def test_empate_mesma_dupla_nao_gera_canga(self):
+        """Dois parceiros da mesma equipe empatando com a maior carta não geram canga; vence o primeiro a jogar."""
+        vira = "5"
+        jogadas = [
+            ("Jogador 1", "A", "3", "Ouros", False),
+            ("Jogador 2", "B", "2", "Espadas", False),
+            ("Jogador 3", "A", "3", "Espadas", False),
+            ("Jogador 4", "B", "Q", "Copas", False),
+        ]
+        vencedor = determinar_vencedor_queda(jogadas, vira)
+        self.assertEqual(vencedor, "Jogador 1")
+
+    def test_quatro_cartas_cobertas_gera_draw(self):
+        """Quatro cartas cobertas têm força zero e a queda resulta em DRAW."""
+        vira = "5"
+        jogadas = [
+            ("Jogador 1", "A", "3", "Ouros", True),
+            ("Jogador 2", "B", "3", "Espadas", True),
+            ("Jogador 3", "A", "2", "Copas", True),
+            ("Jogador 4", "B", "Q", "Paus", True),
+        ]
+        vencedor = determinar_vencedor_queda(jogadas, vira)
+        self.assertEqual(vencedor, "DRAW")
 
 if __name__ == "__main__":
     unittest.main()

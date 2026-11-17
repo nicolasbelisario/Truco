@@ -23,6 +23,9 @@ end
     usado no fim da partida ou quando o estado precisa ser limpo completamente.
 ]]
 function RoundManager:ResetarEstado()
+    self.IDRodada = (self.IDRodada or 0) + 1
+    self.CorteFoiRealizado = false
+    self.EquipeMaoDeOnze = nil
     self.BaralhoAtual = {}
     self.CartasNaMesa = {}
     self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
@@ -41,6 +44,9 @@ end
 ]]
 function RoundManager:IniciarNovaRodada()
     local ctx = self.Ctx
+    self.IDRodada = (self.IDRodada or 0) + 1
+    self.CorteFoiRealizado = false
+    self.EquipeMaoDeOnze = nil
     self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
     self.HistoricoQuedas = {}
     self.CartasNaMesa = {}
@@ -60,15 +66,23 @@ function RoundManager:IniciarNovaRodada()
     
     local papeis = self:ObterPapeis()
     local jogadorCorte = ctx:ObterJogadorPorCadeira(papeis.Corte)
+    local idRodadaAtual = self.IDRodada
     
     if ctx:EBot(jogadorCorte) then 
-        task.delay(1.5, function() self:CortarBaralho(jogadorCorte, 1) end)
+        task.delay(1.5, function()
+            if self.IDRodada == idRodadaAtual and not self.CorteFoiRealizado and ctx.Estado == "CUTTING" then
+                self:CortarBaralho(jogadorCorte, 1)
+            end
+        end)
     elseif jogadorCorte then 
         EventBroadcaster.PedirAcao(jogadorCorte, "EscolhaOCorte", 10) 
     end
     
     task.delay(11, function() 
-        if ctx.Estado == "CUTTING" then self:DistribuirCartas() end 
+        if self.IDRodada == idRodadaAtual and not self.CorteFoiRealizado and ctx.Estado == "CUTTING" then
+            self.CorteFoiRealizado = true
+            self:DistribuirCartas()
+        end
     end)
 end
 
@@ -80,10 +94,11 @@ end
 ]]
 function RoundManager:CortarBaralho(jogador, quantidade)
     local ctx = self.Ctx
-    if ctx.Estado ~= "CUTTING" then return end
+    if ctx.Estado ~= "CUTTING" or self.CorteFoiRealizado then return end
     
     local papeis = self:ObterPapeis()
     if ctx:ObterJogadorPorCadeira(papeis.Corte) == jogador then
+        self.CorteFoiRealizado = true
         GerenciadorBaralho.Cortar(self.BaralhoAtual, quantidade)
         self:DistribuirCartas()
     end
@@ -121,7 +136,9 @@ function RoundManager:DistribuirCartas()
         end
     end
     
+    local idRodadaAtual = self.IDRodada
     task.wait(1)
+    if self.IDRodada ~= idRodadaAtual or ctx.Estado ~= "DEALING" then return end
     ctx.Estado = "PLAYING"
     local papeis = self:ObterPapeis()
     self.IndexTurnoAtual = tonumber(papeis.Mao:match("%d+"))
@@ -185,6 +202,7 @@ function RoundManager:JogarCarta(jogador, cardId, escondida, skinUsada)
     -- Insere o objeto da carta completo na mesa, com informações adicionais
     table.insert(self.CartasNaMesa, {
         Player = jogador, 
+        Team = ctx:ObterEquipe(jogador),
         Value = cartaJogada.Value, 
         Suit = cartaJogada.Suit,
         Strength = cartaJogada.Strength,
@@ -197,7 +215,9 @@ function RoundManager:JogarCarta(jogador, cardId, escondida, skinUsada)
     EventBroadcaster.CartaJogada(ctx:ObterHumanos(), nomeExibicao, cartaJogada.Value, cartaJogada.Suit, escondida, skinUsada)
     
     if #self.CartasNaMesa >= 4 then
+        local idRodadaAtual = self.IDRodada
         task.wait(1.5)
+        if self.IDRodada ~= idRodadaAtual or ctx.Estado ~= "PLAYING" then return end
         self:AvaliarQueda()
     else
         self.IndexTurnoAtual = (self.IndexTurnoAtual - 2) % 4 + 1
@@ -232,7 +252,11 @@ function RoundManager:AvaliarQueda()
     
     self.CartasNaMesa = {} 
     
-    EventBroadcaster.ParaTodos(ctx.Assentos, "CLEAR_TABLE", {TeamA = self.QuedasGanhas.TeamA, TeamB = self.QuedasGanhas.TeamB}, ctx.VerificarBot)
+    EventBroadcaster.ParaTodos(ctx.Assentos, "CLEAR_TABLE", {
+        TeamA = self.QuedasGanhas.TeamA,
+        TeamB = self.QuedasGanhas.TeamB,
+        Winner = equipeVencedora,
+    }, ctx.VerificarBot)
     
     local vencedorMao = nil
     local q1, q2, q3 = self.HistoricoQuedas[1], self.HistoricoQuedas[2], self.HistoricoQuedas[3]
@@ -259,7 +283,9 @@ function RoundManager:AvaliarQueda()
     if vencedorMao then 
         ctx:FinalizarMao(vencedorMao, self.ValorRodada)
     else 
+        local idRodadaAtual = self.IDRodada
         task.wait(1)
+        if self.IDRodada ~= idRodadaAtual or ctx.Estado ~= "PLAYING" then return end
         self:AvancarTurno() 
     end
 end
@@ -309,28 +335,55 @@ function RoundManager:IniciarMaoDeOnze(equipeOnze)
     self:prepararBaralhoEDistribuirInternamente()
 
     ctx.Estado = "ELEVEN_DECISION"
+    self.EquipeMaoDeOnze = equipeOnze
+    local idRodadaAtual = self.IDRodada
     
     -- Monta a lista de jogadores da equipe que vai decidir
     local equipeDecisao = {}
+    local temHumano = false
+    local primeiroHumano = nil
     for _, p in pairs(ctx.Assentos) do
         if ctx:ObterEquipe(p) == equipeOnze then
             table.insert(equipeDecisao, p)
+            if not ctx:EBot(p) then
+                temHumano = true
+                if not primeiroHumano then
+                    primeiroHumano = p
+                end
+            end
         end
     end
 
-    -- Envia para a equipe a notificação para decidir, incluindo as cartas do parceiro
+    -- Para cada jogador humano, envia suas cartas e a vira + tela de decisão
     for _, jogador in ipairs(equipeDecisao) do
         local parceiro = ctx:ObterParceiro(jogador)
         local maoParceiro = self.MaosJogadores[parceiro]
         
-        if ctx:EBot(jogador) then
-            -- Lógica para o Bot decidir
-            task.delay(2, function()
-                jogador:DecidirMaoDeOnze(maoParceiro)
-            end)
-        else
+        if not ctx:EBot(jogador) then
+            local nomeParceiro = ctx:EBot(parceiro) and parceiro.Nome or (parceiro and parceiro.Name or "...")
+            EventBroadcaster.DistribuirCartas(jogador, self.MaosJogadores[jogador], self.ViraAtual, nomeParceiro)
             EventBroadcaster.ParaJogador(jogador, "SHOW_ELEVEN_DECISION", maoParceiro, ctx.VerificarBot)
         end
+    end
+
+    if not temHumano then
+        for _, jogador in ipairs(equipeDecisao) do
+            if ctx:EBot(jogador) then
+                local parceiro = ctx:ObterParceiro(jogador)
+                local maoParceiro = self.MaosJogadores[parceiro]
+                task.delay(2, function()
+                    if self.IDRodada == idRodadaAtual and ctx.Estado == "ELEVEN_DECISION" then
+                        jogador:DecidirMaoDeOnze(maoParceiro)
+                    end
+                end)
+            end
+        end
+    else
+        task.delay(20, function()
+            if self.IDRodada == idRodadaAtual and ctx.Estado == "ELEVEN_DECISION" then
+                self:DecidirMaoDeOnze(primeiroHumano, "JOGAR")
+            end
+        end)
     end
 end
 
@@ -344,6 +397,12 @@ function RoundManager:DecidirMaoDeOnze(jogador, decisao)
     if ctx.Estado ~= "ELEVEN_DECISION" then return end
 
     local equipeJogador = ctx:ObterEquipe(jogador)
+    if self.EquipeMaoDeOnze and equipeJogador ~= self.EquipeMaoDeOnze then return end
+    if decisao ~= "CORRER" and decisao ~= "JOGAR" then return end
+
+    self.EquipeMaoDeOnze = nil
+    EventBroadcaster.ParaTodos(ctx.Assentos, "HIDE_ELEVEN_DECISION", nil, ctx.VerificarBot)
+
     local equipeOponente = (equipeJogador == "A") and "B" or "A"
 
     if decisao == "CORRER" then
@@ -353,7 +412,6 @@ function RoundManager:DecidirMaoDeOnze(jogador, decisao)
         -- A equipe aceitou jogar, a rodada começa valendo 3 pontos.
         self:iniciarTurnosPosDistribuicao()
     end
-    EventBroadcaster.ParaTodos(ctx.Assentos, "HIDE_ELEVEN_DECISION", nil, ctx.VerificarBot)
 end
 
 --[[
@@ -376,6 +434,9 @@ end
 
 -- Função auxiliar para limpar o estado para uma nova rodada
 function RoundManager:limparParaNovaRodada(valor)
+    self.IDRodada = (self.IDRodada or 0) + 1
+    self.CorteFoiRealizado = false
+    self.EquipeMaoDeOnze = nil
     self.QuedasGanhas = { TeamA = 0, TeamB = 0 }
     self.HistoricoQuedas = {}
     self.CartasNaMesa = {}
@@ -428,7 +489,9 @@ function RoundManager:iniciarTurnosPosDistribuicao()
         end
     end
     
+    local idRodadaAtual = self.IDRodada
     task.wait(1)
+    if self.IDRodada ~= idRodadaAtual then return end
     ctx.Estado = "PLAYING"
     local papeis = self:ObterPapeis()
     self.IndexTurnoAtual = tonumber(papeis.Mao:match("%d+"))

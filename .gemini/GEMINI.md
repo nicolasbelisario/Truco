@@ -1,99 +1,120 @@
-# Módulo/Domínio: Truco Paulista Roblox
+# Contexto Primário SDD — Truco Paulista (Roblox)
 
-## 1. Visão Geral e Linguagem Ubíqua (Glossário)
-- **Truco Paulista**: Jogo de cartas brasileiro para quatro participantes, jogado em duplas, com o objetivo de atingir uma pontuação predefinida através de rodadas.
-- **Baralho Limpo**: Baralho de 40 cartas, excluindo os 8s, 9s e 10s.
-- **Vira**: A carta virada na mesa no início de cada mão, que determina as quatro cartas Manilhas daquela mão.
-- **Manilha**: As quatro cartas mais fortes do jogo em uma dada mão, definidas pela "Vira". São as cartas imediatamente superiores à Vira na ordem de força padrão, cada uma de um naipe diferente.
-- **Multiplicador de Pontos**: Mecanismo pelo qual os jogadores podem aumentar o valor de uma mão em andamento, através de chamadas como "Truco", "Seis", "Nove" e "Doze".
-- **Mão de Onze**: Uma regra especial que ocorre quando uma dupla atinge 11 pontos, permitindo-lhes uma decisão estratégica sobre a próxima mão.
-- **Bots IA**: Jogadores controlados por inteligência artificial que simulam o comportamento humano no jogo.
-- **Skins**: Elementos visuais customizáveis para as cartas e baralhos, adquiridos na loja do jogo.
-- **Pontos de Recompensa**: Pontos concedidos aos jogadores ao final de cada partida, utilizados para adquirir skins.
+> Este documento é a **fonte primária de contexto para IAs** (Antigravity, Copilot e agentes SDD).
+> Toda especificação detalhada vive em `docs/` e as validações automatizadas vivem em `.gemini/skills/`.
 
-## 2. Regras de Negócio Core (Invariants)
-- **[RN-01] [Formato da Partida]**: Uma partida de Truco Paulista sempre envolve 4 participantes, organizados em duas duplas.
-- **[RN-02] [Composição da Partida]**: As partidas podem ser compostas por 4 jogadores humanos, ou uma combinação de jogadores humanos e Bots IA (1v3, 2v2, 3v1).
-- **[RN-03] [Baralho Padrão]**: O jogo utiliza um baralho limpo de 40 cartas, removendo os 8s, 9s e 10s.
-- **[RN-04] [Distribuição de Cartas]**: No início de cada mão, cada jogador recebe exatamente 3 cartas.
-- **[RN-05] [Definição da Vira]**: Uma carta é virada na mesa no início de cada mão para determinar as manilhas.
-- **[RN-06] [Definição das Manilhas]**: As manilhas são as quatro cartas imediatamente superiores à "Vira" na ordem de força padrão (4, 5, 6, 7, Q, J, K, A, 2, 3).
-- **[RN-07] [Força das Manilhas por Naipe]**: A ordem de força das manilhas por naipe é fixa: Paus (Zap) > Copas > Espadas > Ouros (Pica-fumo).
-- **[RN-08] [Ordem de Força Padrão]**: A ordem de força padrão das cartas (crescente) é: 4, 5, 6, 7, Q, J, K, A, 2, 3.
-- **[RN-09] [Terminologia Proibida]**: O sistema NÃO deve usar os termos "aposta" ou "gambling" na interface ou no código, em conformidade com as diretrizes da plataforma Roblox.
-- **[RN-10] [Valor Base da Mão]**: O valor inicial de uma mão é de 1 ponto.
-- **[RN-11] [Multiplicadores de Pontos]**: Os valores possíveis para uma mão são: 1 (base), 3 (Truco), 6 (Seis), 9 (Nove) e 12 (Doze).
-- **[RN-12] [Decisão dos Bots]**: Bots IA devem tomar decisões de jogada, pedido de truco e resposta a truco com base no estado atual do jogo.
-- **[RN-13] [Recompensas Pós-Partida]**: Ao final de cada partida, os jogadores recebem pontos de recompensa/experiência.
-- **[RN-14] [Variação de Recompensas]**: A quantidade de pontos de recompensa varia conforme o resultado (vitória/derrota) e o tipo de oponente (vitórias contra jogadores reais concedem mais pontos).
-- **[RN-15] [Uso dos Pontos]**: Os pontos acumulados são exclusivamente para a aquisição de skins customizadas de cartas e baralhos na loja do jogo.
-- **[RN-16] [Elementos de Áudio]**: O jogo deve incluir trilha sonora em loop e efeitos sonoros (SFX) para eventos chave como distribuição de cartas, descarte, chamadas de Truco e resultados de partida.
-- **[RN-17] [Renderização Visual]**: As cartas são renderizadas visualmente em 3D/SurfaceGUI utilizando texturas e skins customizadas.
+---
 
-## 3. Validações e Restrições de Entrada/Saída
-- **Entradas válidas**:
-    - Ações de jogo (jogar carta, pedir truco, aceitar/aumentar/fugir truco) devem ser realizadas pelo jogador cujo turno está ativo.
-    - Uma carta só pode ser jogada se pertencer à mão do jogador e não tiver sido jogada anteriormente na mesma mão.
-    - Um pedido de Truco (ou aumento) só pode ser feito se o valor atual da mão permitir um aumento e não houver um pedido pendente da mesma dupla.
-    - A seleção de skins na loja deve corresponder a skins existentes e que o jogador possui ou tem pontos suficientes para adquirir.
-- **Entradas inválidas**:
-    - Tentativa de um jogador de realizar uma ação fora de seu turno.
-    - Tentativa de jogar uma carta que não está na mão do jogador ou que já foi jogada.
-    - Tentativa de pedir Truco quando o valor máximo da mão já foi atingido (12 pontos).
-    - Uso de termos proibidos ("aposta", "gambling") em qualquer entrada de texto do usuário ou configuração do jogo.
-    - Tentativa de adquirir uma skin sem pontos suficientes.
+## 1. Mapa da Documentação SDD
 
-## 4. Fluxo de Execução e Casos de Borda (Edge Cases)
-- **Caminho Feliz**:
-  1. Quatro jogadores (humanos e/ou bots) entram na mesa e a partida é iniciada.
-  2. O baralho é embaralhado, e 3 cartas são distribuídas para cada jogador.
-  3. Uma carta é virada na mesa para definir as manilhas da mão.
-  4. Os jogadores jogam suas cartas em turnos, seguindo a ordem de força e as regras do Truco.
-  5. Durante a mão, um jogador pode pedir "Truco", aumentando o valor da mão para 3 pontos.
-  6. A dupla adversária pode "Aceitar", "Aumentar" (para Seis, Nove, Doze) ou "Fugir".
-  7. A rodada é vencida pela dupla que jogar a carta de maior força.
-  8. Os pontos correspondentes ao valor da mão são atribuídos à dupla vencedora.
-  9. Novas mãos são jogadas até que uma dupla atinja a pontuação final da partida.
-  10. A partida é encerrada, e os pontos de recompensa/experiência são distribuídos aos jogadores.
-- **Casos de Borda**:
-  - **Mão de Onze (Uma Dupla)**:
-    - Se uma dupla atinge 11 pontos e a outra tem menos de 11, a dupla de 11 pode visualizar as cartas do parceiro.
-    - Eles devem decidir se "Jogam" a mão (que automaticamente valerá 3 pontos) ou "Fogem" (concedendo 1 ponto à dupla adversária).
-  - **Mão de Onze (Ambas as Duplas)**:
-    - Se ambas as duplas atingem 11 pontos simultaneamente, a mão é disputada "no escuro" (sem que os parceiros vejam as cartas um do outro) e o valor da mão é automaticamente 3 pontos.
-  - **Decisões dos Bots**:
-    - Bots devem sempre ter uma lógica de decisão para jogar cartas, pedir truco e responder a truco, mesmo em situações desfavoráveis ou de empate.
-  - **Empate de Rodada**:
-    - Se houver empate na maior carta jogada em uma rodada, a regra de desempate do Truco Paulista deve ser aplicada (e.g., quem pediu truco primeiro, ou a dupla que venceu a rodada anterior, ou a mão é anulada dependendo da regra específica adotada).
+| Artefato | Caminho | Finalidade |
+| :--- | :--- | :--- |
+| **Wiki Principal** | [docs/wiki/README.md](../docs/wiki/README.md) | Visão do produto, modos de jogo e quick start |
+| **Glossário** | [docs/wiki/GLOSSARY.md](../docs/wiki/GLOSSARY.md) | Linguagem ubíqua canônica do domínio |
+| **Arquitetura** | [docs/wiki/ARCHITECTURE.md](../docs/wiki/ARCHITECTURE.md) | Módulos reais, fluxo de estados, rede e contrato 3D |
+| **Regras de Negócio** | [docs/wiki/BUSINESS_RULES.md](../docs/wiki/BUSINESS_RULES.md) | Invariantes `RN-01` a `RN-39` e divergências conhecidas |
+| **Roadmap & Benchmark** | [docs/wiki/ROBLOX_GROWTH_ROADMAP.md](../docs/wiki/ROBLOX_GROWTH_ROADMAP.md) | Auditoria técnica/visual e plano de evolução Roblox |
+| **Use Cases** | [docs/use-cases/UC_INDEX.md](../docs/use-cases/UC_INDEX.md) | Índice de casos de uso implementados e planejados |
+| **ADRs** | [docs/ADR/ADR-001_SDD_Setup.md](../docs/ADR/ADR-001_SDD_Setup.md) | Decisões arquiteturais (`ADR-001`, `ADR-002`) |
+| **Changelog** | [docs/CHANGELOG.md](../docs/CHANGELOG.md) | Histórico de entregas e mudanças |
 
-## 5. Diretrizes de Código e Arquitetura (Roblox/Luau)
-- **Estruturas de Dados**:
-    - `Card`: Tabela contendo `naipe` (string), `valor` (string/int), `forcaAbsoluta` (int para ordenação padrão), `forcaManilha` (int para ordenação de manilhas), `idUnico` (string/int).
-    - `PlayerState`: Tabela para cada jogador com `UserId`, `Name`, `Hand` (array de `Card`), `IsBot` (boolean), `CurrentPointsInMatch` (int), `TeamId`.
-    - `TeamState`: Tabela para cada dupla com `TeamId`, `Players` (array de `PlayerState`), `PointsInRound` (int), `PointsInMatch` (int).
-    - `GameState`: Tabela centralizada no servidor contendo `CurrentVira` (Card), `ActiveManilhas` (array de Card), `CardsOnTable` (array de {`PlayerId`, `Card`}), `CurrentMultiplier` (int), `CurrentTurnPlayerId`, `TrucoCallerTeamId`, `MatchStatus` (enum: "Waiting", "Playing", "Ended"), `RoundNumber`, `HandNumber`.
-    - `BotAIConfig`: Tabela com parâmetros de dificuldade e estratégias para bots.
-- **Eventos/RemoteEvents**:
-    - **Cliente -> Servidor (RemoteFunctions/RemoteEvents)**:
-        - `RequestPlayCard(cardId)`: Jogador tenta jogar uma carta.
-        - `RequestTruco()`: Jogador pede truco.
-        - `RespondTruco(action: "Aceitar" | "Aumentar" | "Fugir")`: Jogador responde a um pedido de truco.
-        - `DecideHandOfEleven(action: "Jogar" | "Fugir")`: Jogador toma decisão na Mão de Onze.
-        - `PlayerReady()`: Sinaliza que o jogador está pronto para iniciar a partida.
-    - **Servidor -> Cliente (RemoteEvents)**:
-        - `UpdateGameState(gameStateData)`: Envia o estado completo ou parcial do jogo para todos os clientes.
-        - `DisplayCards(cardsInHand)`: Envia as cartas para a mão de um jogador específico.
-        - `CardPlayed(playerId, cardData)`: Notifica que uma carta foi jogada.
-        - `TrucoRequested(callerPlayerId, currentMultiplier)`: Notifica que truco foi pedido.
-        - `TrucoResponse(responderPlayerId, action, newMultiplier)`: Notifica a resposta ao truco.
-        - `ShowHandOfElevenDecision(partnerCards)`: Exibe as cartas do parceiro e opções de decisão para a dupla na Mão de Onze.
-        - `MatchEnded(winningTeamId, rewards)`: Notifica o fim da partida e as recompensas.
-        - `PlaySFX(soundId, volume)`: Dispara efeitos sonoros no cliente.
-- **Tratamento de Estado**:
-    - O estado canônico da partida deve ser mantido exclusivamente no servidor para evitar cheats e garantir a integridade.
-    - Módulos de serviço no `ServerScriptService` (e.g., `GameService`, `PlayerService`, `BotService`, `CardService`) devem gerenciar as transições de estado e a lógica de negócio.
-    - `ReplicatedStorage` para `RemoteEvents`, `RemoteFunctions` e módulos compartilhados (e.g., `CardSettings`, `GameConstants`).
-    - `StarterPlayerScripts` para a lógica do cliente que interage com a UI e envia ações ao servidor.
-    - Utilizar `BindableEvents` e `BindableFunctions` para comunicação interna entre módulos do servidor, promovendo desacoplamento.
-    - A renderização visual das cartas e UI deve ser responsabilidade do cliente, que reage às atualizações de estado enviadas pelo servidor.
-```
+---
+
+## 2. Linguagem Ubíqua Canônica (Resumo)
+
+- **Partida (`Match.luau`)**: Sessão completa entre 4 participantes em 2 duplas cruzadas (Cadeiras `1 & 3` vs `2 & 4`) até **12 pontos**.
+- **Mão (`RoundManager.luau`)**: Ciclo em que cada jogador recebe 3 cartas e disputa até 3 Quedas para ganhar o valor da Mão (base 1, escalável para 3/6/9/12).
+- **Queda**: Uma rodada de 4 cartas jogadas (1 por assento). Melhor de 3 Quedas vence a Mão.
+- **Canga**: Empate na maior carta de uma Queda (entre duplas adversárias).
+- **Baralho Limpo**: 40 cartas (`4, 5, 6, 7, Q, J, K, A, 2, 3`), sem `8`, `9` e `10`.
+- **Vira & Manilha**: Carta virada que define as 4 Manilhas (valor imediatamente superior na ordem padrão; se Vira = `3`, Manilha = `4`). Força fixa: **Paus (Zap) > Copas > Espadas > Ouros (Pica-fumo)**.
+- **Carta Coberta (Escondida)**: Carta jogada virada para baixo com força `0`. Proibida na 1ª Queda.
+- **Mão de Onze / Mão de Ferro**: Regra especial aos 11 pontos (`11 x <11` vê mão do parceiro e escolhe `JOGAR` por 3 pts ou `CORRER` dando 1 pt; `11 x 11` é jogada no escuro por 3 pts). Truco desativado em ambas.
+- **Sinal / Emote**: Comunicação visual de mesa (`Sinal_Mao`, `Sinal_Olhar`) com cooldown de 3s.
+- **Pontos & Apoiador**: Moeda interna para comprar Skins cosméticas; compras via Robux acumulam `RobuxGasto` no ranking de Apoiadores.
+
+---
+
+## 3. Regras de Negócio Invariantes (`RN-01` a `RN-39`)
+
+- **Partida & Baralho**: `RN-01` (4 participantes em 2 duplas), `RN-02` (PvP ou PvE `1+3`, `2+2`, `3+1`), `RN-03` (40 cartas), `RN-04` (3 cartas por jogador), `RN-05` (Vira define Manilhas).
+- **Hierarquia & Cartas**: `RN-06` (manilha = carta seguinte à Vira), `RN-07` (Zap > Copas > Espadas > Ouros), `RN-08` (`4 < 5 < 6 < 7 < Q < J < K < A < 2 < 3`), `RN-17` (carta coberta = força `0`), `RN-18` (sem carta coberta na 1ª Queda).
+- **Pontuação & Quedas**: `RN-10` (Mão inicia em `1`), `RN-11` (`1 -> 3 -> 6 -> 9 -> 12`), `RN-19` (melhor de 3 Quedas), `RN-20` (regras de Canga: empate na 1ª decide na 2ª/3ª; empate entre parceiros da mesma dupla pertence à dupla), `RN-21` (vitória aos `12` pontos).
+- **Desafio de Truco**: `RN-22` (apenas em `PLAYING`), `RN-23` (mesma equipe não escala consecutivamente), `RN-24` (`Aceitar`, `Aumentar`, `Correr`), `RN-25` (correr entrega valor anterior), `RN-26` (timeout `15s` = correr automático), `RN-27` (2 humanos exigem votos iguais).
+- **Especiais**: `RN-28`/`RN-29` (Mão de Onze), `RN-30` (Mão de Ferro), `RN-31` (Truco desativado em ambas).
+- **Economia, Loja & Compliance**:
+  - `RN-09` **[CRÍTICO]**: **Proibido** usar os termos `"aposta"`, `"gambling"`, `"bet"` ou `"stake"` em código, configs, UI ou textos públicos.
+  - `RN-13`, `RN-14`, `RN-15a`, `RN-15`: Recompensas pós-partida (`PvP`: +50/+20; `PvE`: +30/+10); Pontos compram apenas Skins cosméticas.
+  - `RN-32` (`"Padrao"` grátis), `RN-33` (sem reembolso de Pontos), `RN-34` (`ProcessReceipt` idempotente/seguro).
+- **Bots, Áudio & Renderização**: `RN-12` (decisão de Bots configurável via `BotConfig`), `RN-16` (BGM em loop + SFX), `RN-17b` (cartas renderizadas em 2D UI e 3D `SurfaceGui`).
+- **Segurança, Persistência & Leaderboard**:
+  - `RN-35`: Estado canônico **exclusivamente no servidor**.
+  - `RN-36`: Validação anti-cheat de turno e propriedade da carta em `MaosJogadores`.
+  - `RN-37`: Schema DataStore `TrucoData_v1` (`Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas`, `SkinEquipada`).
+  - `RN-38`: 3 `OrderedDataStore` em `LeaderboardManager.luau` + quadro físico 3D `Workspace.LeaderboardBoard`.
+  - `RN-39`: `AdminManager.luau` valida `UserId` no servidor.
+
+---
+
+## 4. Arquitetura Real e Módulos (`src/` via Rojo)
+
+Mapeamento definido em [default.project.json](../default.project.json):
+
+- **Shared (`ReplicatedStorage.Shared` → `src/shared/`)**:
+  - `Configs/EconomyConfig.luau` — Single Source of Truth de recompensas, catálogo de Skins e `ProdutosRobux`.
+  - `Configs/BotConfig.luau` — Tempos e parâmetros das dificuldades `Facil`, `Normal`, `Dificil`.
+  - `Configs/GameRulesConfig.luau` — Limites (`MAX_PLAYERS = 4`, `PONTOS_VITORIA_PARTIDA = 12`), tempos, valores de Mão, `States`, `StateDisplayNames` e `TEAMS`.
+  - `CardSettings.luau` — Naipes, valores, spritesheets e `AplicarSkinCarta()`.
+  - `GameConfig.luau` — Wrapper de retrocompatibilidade para `GameRulesConfig`.
+  - `BotDummy.rbxm` — Template R15 do avatar 3D de Bot.
+- **Server (`ServerScriptService` → `src/server/`)**:
+  - Serviços Core: `Main.server.luau`, `TableManager.luau`, `DataManager.luau`, `ShopManager.luau`, `RobuxManager.luau`, `LeaderboardManager.luau`, `AdminManager.luau`.
+  - `Classes/`: `Match.luau`, `RoundManager.luau`, `TrucoHandler.luau`, `Bot.luau`, `EventBroadcaster.luau`.
+  - `Utils/`: `DeckManager.luau`, `RuleManager.luau`, `AvatarManager.luau`.
+- **Client (`StarterPlayer.StarterPlayerScripts.Client` → `src/client/`)**:
+  - Entrada & Mundo 3D: `init.client.luau`, `TableVisuals.luau`.
+  - `UI/`: `UIManager.luau`, `HandUI.luau`, `TableUI.luau`, `TrucoUI.luau`, `ScoreUI.luau`, `ShopUI.luau`, `LeaderboardUI.luau`, `TutorialUI.luau`, `CameraManager.luau`, `SoundManager.luau`.
+
+---
+
+## 5. Protocolo de Rede Real (`ReplicatedStorage.Events`)
+
+- **RemoteEvents**:
+  - `PlayCardEvent` (C→S: `cardId, escondida`)
+  - `TrucoEvent` (C→S: `"Request" | "Response", subAcao`)
+  - `GameStatusEvent` (C→S: `"CutAction" | "HandOfElevenDecision", valor`; S→C: estados e notificações via `EventBroadcaster.ParaTodos` / `ParaJogador`)
+  - `RequestAction` (S→C: `"EscolhaOCorte"`, `"TrucoChallenge"`)
+  - `DealCards` (S→C: `mao, vira, nomeParceiro`)
+  - `UpdateTurnEvent` (S→C: `nomeVez, numRodada`)
+  - `CardPlayedOnTable` (S→C: `nomeExibicao, valor, naipe, escondida, skin`)
+  - `SignalEvent` (Bidirecional: `tipoSinal` / `remetente, tipoSinal`)
+  - `ShopActionEvent` (C→S: `"Comprar" | "Equipar", skinId`)
+  - `SyncDataEvent` (S→C: `dados`)
+  - `AdminActionEvent` (C→S: `"Adicionar" | "Remover", alvoNome, quantidadeStr`)
+- **RemoteFunctions**:
+  - `GetLeaderboardData` (C→S: `categoria: "Vitorias" | "Pontos" | "Robux"`)
+
+---
+
+## 6. Contrato do DataModel 3D (`Workspace`)
+
+- `Workspace.MesasFolder`: Modelos de mesa (`Mesa1..4`, `MesaPvE_Solo_1..2`, `MesaPvE_Dupla_1..2`, `MesaPvE_Trio_1..2`, com `Attribute` `TipoMesa`). Cada modelo **deve** conter:
+  - `Mesa.Topo` (`BasePart` — referência para `TableVisuals.GerarCarta`)
+  - `Cadeiras.Cadeira1..4` (cada uma contendo um `Seat`; `1 & 3` = TeamA, `2 & 4` = TeamB)
+  - `CartasNaMesa` (`Folder` para instâncias 3D temporárias)
+- `Workspace.LeaderboardBoard`: `BasePart` ou `Model` (com `DisplayPart`/`PrimaryPart`) onde `LeaderboardManager` injeta a `LeaderboardSurfaceGui`.
+- `Workspace.Tutorial.ZonaTutorial`: `BasePart` usada para abertura automática do tutorial por proximidade (`RAIO_ZONA = 8`).
+
+---
+
+## 7. Workflow: Rojo, Skills SDD e MCP
+
+1. **Regra de Ouro Rojo**: Nunca edite scripts diretamente dentro do Roblox Studio; toda alteração Luau deve ser feita em `src/` para manter Git + Rojo sincronizados.
+2. **Skills SDD (`.gemini/skills/` espelhadas em `skills/`)**:
+   - `truco-core-rules`: `python .gemini/skills/truco-core-rules/tests/test_rules.py`
+   - `truco-match-flow`: `python .gemini/skills/truco-match-flow/tests/test_match_flow.py`
+   - `game-balance-economy`: `python .gemini/skills/game-balance-economy/tests/validate_configs.py`
+   Sempre execute os testes relevantes ao alterar regras, fluxo de partida ou `src/shared/Configs/`.
+3. **Servidores MCP Ativos**:
+   - **`Roblox_Studio`**: Inspecionar hierarquia (`search_game_tree`, `inspect_instance`), capturar viewport (`screen_capture`), executar testes de Play e editar propriedades/modelos 3D do DataModel.
+   - **`roblox-studio-logs`** ([mcp.json](../mcp.json)): Ler output e erros em tempo real do Studio (`read_roblox_studio_output`, `check_roblox_errors_and_warnings`, `get_roblox_log_session_info`).

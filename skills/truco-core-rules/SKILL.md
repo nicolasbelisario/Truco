@@ -20,15 +20,16 @@ Garantir a integridade absoluta das regras do Truco Paulista no servidor Roblox,
    - A manilha é a carta imediatamente seguinte à Vira na ordem padrão. Se a Vira for 3, a manilha é 4.
    - Ordem de força por naipe:
      $$\text{Paus (Zap)} > \text{Copas} > \text{Espadas} > \text{Ouros (Pica-fumo)}$$
-5. **[RN-17] Carta Coberta (Escondida)**:
+5. **[RN-17 & RN-18] Carta Coberta (Escondida)**:
    - Carta jogada coberta tem força numérica $0$.
    - Não pode ser jogada na 1ª queda de uma Mão (forçada para `escondida = false`).
 6. **[RN-20] Regra de Canga (Empate na Queda)**:
+   - Empate real (`DRAW`) ocorre apenas quando as maiores cartas de mesma força pertencem a **duplas adversárias**; se dois parceiros da mesma dupla jogarem as maiores cartas empatadas entre si, a queda pertence à dupla deles (validado por `jogada.Team` em `RuleManager.ObterVencedorRodada()`). Se todas as 4 cartas forem cobertas (`forca = 0`), resulta em `DRAW`.
    - Se a 1ª queda empatar, quem vencer a 2ª queda vence a Mão.
    - Se a 1ª e a 2ª empatarem, quem vencer a 3ª queda vence a Mão.
    - Se as 3 quedas empatarem, ninguém pontua (`DRAW`).
-7. **[RN-28 & RN-31] Mão de Onze & Mão de Ferro**:
-   - Se uma equipe atinge 11 pontos, joga Mão de Onze valendo 3 pontos. **Truco desativado**.
+7. **[RN-28 a RN-31] Mão de Onze & Mão de Ferro**:
+   - Se apenas uma equipe atinge 11 pontos, joga Mão de Onze valendo 3 pontos (vê cartas do parceiro e decide Jogar ou Correr). **Truco desativado**.
    - Se ambas as equipes têm 11 pontos, joga Mão de Ferro no escuro valendo 3 pontos. **Truco desativado**.
 
 ---
@@ -37,6 +38,7 @@ Garantir a integridade absoluta das regras do Truco Paulista no servidor Roblox,
 - `src/server/Utils/DeckManager.luau` — Geração do baralho, embaralhamento, corte e manilhas.
 - `src/server/Utils/RuleManager.luau` — Cálculo de força individual e vencedor de cada queda.
 - `src/shared/CardSettings.luau` — Mapeamento de naipes, valores e spritesheets.
+- `src/shared/Configs/GameRulesConfig.luau` — Constantes de pontuação, valores de Mão e regras especiais.
 
 ---
 
