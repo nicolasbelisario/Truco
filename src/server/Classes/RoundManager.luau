@@ -256,6 +256,7 @@ function RoundManager:AvaliarQueda()
         TeamA = self.QuedasGanhas.TeamA,
         TeamB = self.QuedasGanhas.TeamB,
         Winner = equipeVencedora,
+        Historico = self.HistoricoQuedas,
     }, ctx.VerificarBot)
     
     local vencedorMao = nil

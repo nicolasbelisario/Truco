@@ -38,11 +38,15 @@ local eMinhaVez      = false
 local possoPedirTruco = true
 local trucoPendente  = false
 local btnTruco
+local mesaAtualRef   = nil
+local assentoAtualRef = nil
 
 -- Variáveis locais resgatadas
 local painelCorte, barraTempoCorte
 local painelEmotes, callbackEmote
-local painelVira
+local painelControlesMesa, btnCamera, btnGrade2D, atualizarVisualGrade2D
+local painelVira, containerInfoScore
+local marcadoresQuedas = {}
 local painelOpcoesJogada
 local painelMaoDeOnze
 local containerCartasParceiro, statusLabelMaoDeOnze, btnJogarMaoDeOnze, btnCorrerMaoDeOnze
@@ -53,9 +57,21 @@ local valorRodadaAtual = 1
 local dadosJogador = { SkinEquipada = "Padrao" }
 local viraAtual = nil
 local imgViraAtual = nil
+local layoutResponsivoCallbacks = {}
 
 -- Barra de menu principal (topo-esquerdo: 🏆 Ranking, 🛒 Loja, ❓ Ajuda, 🔊 Áudio)
 local barraMenuPrincipal
+
+local function registrarLayoutResponsivo(fn)
+    table.insert(layoutResponsivoCallbacks, fn)
+    fn()
+end
+
+local function atualizarLayoutsResponsivos()
+    for _, fn in ipairs(layoutResponsivoCallbacks) do
+        fn()
+    end
+end
 
 function UIManager.Inicializar()
     local GuiService = game:GetService("GuiService")
@@ -90,7 +106,10 @@ function UIManager.Inicializar()
     atualizarPosicaoBarraMenu()
     GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(atualizarPosicaoBarraMenu)
     if workspace.CurrentCamera then
-        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(atualizarPosicaoBarraMenu)
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            atualizarPosicaoBarraMenu()
+            atualizarLayoutsResponsivos()
+        end)
     end
 
     -- CORREÇÃO DA ORDEM DE RENDERIZAÇÃO: TableUI inicializa primeiro!
@@ -120,6 +139,7 @@ function UIManager.Inicializar()
     UIManager._CriarMenuAdmin()
     UIManager._CriarMenuCorte()
     UIManager._CriarBotoesEmote()
+    UIManager._CriarControlesMesa()
     UIManager._CriarMenuMaoDeOnze()
 end
 
@@ -143,7 +163,10 @@ function UIManager.MostrarOpcoesJogada(botaoCarta, card, container, onJogarCarta
 
     local absPos  = botaoCarta.AbsolutePosition
     local absSize = botaoCarta.AbsoluteSize
-    painelOpcoesJogada.Position = UDim2.new(0, absPos.X + (absSize.X / 2), 0, absPos.Y + 50)
+    local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+    local posX = math.clamp(absPos.X + (absSize.X / 2), (larguraMenu / 2) + 8, math.max(vp.X - (larguraMenu / 2) - 8, (larguraMenu / 2) + 8))
+    local posY = math.max(alturaMenu + 12, absPos.Y - 8)
+    painelOpcoesJogada.Position = UDim2.new(0, posX, 0, posY)
     painelOpcoesJogada.Parent   = painelTela
 
     Instance.new("UICorner", painelOpcoesJogada).CornerRadius = UDim.new(0, 12)
@@ -206,14 +229,24 @@ function UIManager.AtualizarValorRodada(v)
     ScoreUI.AtualizarValorRodada(v, estaSentado)
 end
 
-function UIManager.AtualizarEstatisticasRodada(p, n, e) ScoreUI.AtualizarEstatisticas(p, n, e, estaSentado) end
+function UIManager.AtualizarEstatisticasRodada(p, n, e, historico)
+    ScoreUI.AtualizarEstatisticas(p, n, e, estaSentado, historico)
+end
 function UIManager.LimparMao()                     HandUI.Limpar(); UIManager.OcultarOpcoesJogada() end
 function UIManager.AdicionarCartaMao(card)         HandUI.AdicionarCarta(card) end
 function UIManager.AdicionarCartaJogadaUI(...)     TableUI.AdicionarCarta(...) end
 function UIManager.LimparMesa()                    TableUI.Limpar() end
 function UIManager.TocarSom(nome)                  SoundManager.Tocar(nome) end
 function UIManager.DefinirModoTensao(ativo)        SoundManager.DefinirModoTensao(ativo) end
-function UIManager.DefinirMesaAtual(modeloMesa)    CameraManager.DefinirMesaAtual(modeloMesa) end
+function UIManager.DefinirMesaAtual(modeloMesa)
+    mesaAtualRef = modeloMesa
+    CameraManager.DefinirMesaAtual(modeloMesa, assentoAtualRef)
+    if estaSentado and mesaAtualRef and assentoAtualRef then
+        CameraManager.AtivarModoMesa(mesaAtualRef, assentoAtualRef)
+    end
+end
+function UIManager.FocarCameraMesa()               CameraManager.FocarMesaSeAtivo() end
+function UIManager.AoMudarModoCamera(cb)           CameraManager.AoMudarModoCamera(cb) end
 function UIManager.ResetarCamera()                 CameraManager.Resetar() end
 function UIManager.MostrarDesafioTruco(v, q, t)   TableUI.DefinirModoLateral(true); TrucoUI.Mostrar(v, q, t) end
 function UIManager.OcultarDesafioTruco()           TrucoUI.Ocultar(); TableUI.DefinirModoLateral(false) end
@@ -235,16 +268,16 @@ function UIManager.OcultarPlacar()                 ScoreUI.OcultarPlacar() end
 -- ==========================================
 
 function UIManager._CriarElementosScore()
-    local containerInfo = Instance.new("Frame")
-    containerInfo.Name               = "InfoContainer"
-    containerInfo.Position           = UDim2.new(0, 72, 0, 60)
-    containerInfo.Size               = UDim2.new(0, 220, 0.5, 0)
-    containerInfo.BackgroundTransparency = 1
-    containerInfo.Parent             = painelTela
+    containerInfoScore = Instance.new("Frame")
+    containerInfoScore.Name                 = "InfoContainer"
+    containerInfoScore.Position             = UDim2.new(0, 72, 0, 60)
+    containerInfoScore.Size                 = UDim2.new(0, 210, 0.5, 0)
+    containerInfoScore.BackgroundTransparency = 1
+    containerInfoScore.Parent               = painelTela
 
-    local layoutLista = Instance.new("UIListLayout", containerInfo)
+    local layoutLista = Instance.new("UIListLayout", containerInfoScore)
     layoutLista.SortOrder = Enum.SortOrder.LayoutOrder
-    layoutLista.Padding   = UDim.new(0, 10)
+    layoutLista.Padding   = UDim.new(0, 8)
 
     -- Cronômetro: topo-centro, legível com UIStroke
     textoCronometro = Instance.new("TextLabel")
@@ -266,30 +299,90 @@ function UIManager._CriarElementosScore()
     bordaCronometro.Thickness = 2
 
     local painelEstatisticas = Instance.new("Frame")
-    painelEstatisticas.Size               = UDim2.new(0, 200, 0, 90)
-    painelEstatisticas.BackgroundColor3   = BG_PAINEL
-    painelEstatisticas.BackgroundTransparency = 0.3
-    painelEstatisticas.Visible            = false
-    painelEstatisticas.LayoutOrder        = 1
-    painelEstatisticas.Parent             = containerInfo
-    Instance.new("UICorner", painelEstatisticas)
+    painelEstatisticas.Name                 = "PainelEstatisticas"
+    painelEstatisticas.Size                 = UDim2.new(0, 200, 0, 74)
+    painelEstatisticas.BackgroundColor3     = BG_PAINEL
+    painelEstatisticas.BackgroundTransparency = 0.25
+    painelEstatisticas.Visible              = false
+    painelEstatisticas.LayoutOrder          = 1
+    painelEstatisticas.Parent               = containerInfoScore
+    Instance.new("UICorner", painelEstatisticas).CornerRadius = UDim.new(0, 10)
     local bordaEstat = Instance.new("UIStroke", painelEstatisticas)
     bordaEstat.Thickness = 1
     bordaEstat.Color     = Color3.fromRGB(55, 55, 70)
 
+    local padEstat = Instance.new("UIPadding", painelEstatisticas)
+    padEstat.PaddingTop    = UDim.new(0, 8)
+    padEstat.PaddingBottom = UDim.new(0, 8)
+    padEstat.PaddingLeft   = UDim.new(0, 10)
+    padEstat.PaddingRight  = UDim.new(0, 10)
+
     local textoEstatisticas = Instance.new("TextLabel")
-    textoEstatisticas.Size               = UDim2.new(0.9, 0, 0.9, 0)
-    textoEstatisticas.Position           = UDim2.new(0.5, 0, 0.5, 0)
-    textoEstatisticas.AnchorPoint        = Vector2.new(0.5, 0.5)
+    textoEstatisticas.Name                 = "TextoDupla"
+    textoEstatisticas.Size                 = UDim2.new(1, 0, 0, 22)
+    textoEstatisticas.Position             = UDim2.new(0, 0, 0, 0)
     textoEstatisticas.BackgroundTransparency = 1
-    textoEstatisticas.TextColor3         = TEXTO_PRIM
-    textoEstatisticas.TextXAlignment     = Enum.TextXAlignment.Left
-    textoEstatisticas.Font               = Enum.Font.GothamMedium
-    textoEstatisticas.TextSize           = 16
-    textoEstatisticas.Parent             = painelEstatisticas
+    textoEstatisticas.TextColor3           = TEXTO_PRIM
+    textoEstatisticas.TextXAlignment       = Enum.TextXAlignment.Left
+    textoEstatisticas.Font                 = Enum.Font.GothamBold
+    textoEstatisticas.TextSize             = 14
+    textoEstatisticas.TextTruncate         = Enum.TextTruncate.AtEnd
+    textoEstatisticas.Text                 = "Dupla: Ninguém"
+    textoEstatisticas.Parent               = painelEstatisticas
+
+    local linhaQuedas = Instance.new("Frame")
+    linhaQuedas.Name                 = "LinhaQuedas"
+    linhaQuedas.Size                 = UDim2.new(1, 0, 0, 28)
+    linhaQuedas.Position             = UDim2.new(0, 0, 1, 0)
+    linhaQuedas.AnchorPoint          = Vector2.new(0, 1)
+    linhaQuedas.BackgroundTransparency = 1
+    linhaQuedas.Parent               = painelEstatisticas
+
+    local lblQuedas = Instance.new("TextLabel")
+    lblQuedas.Name                 = "LabelQuedas"
+    lblQuedas.Size                 = UDim2.new(0, 68, 1, 0)
+    lblQuedas.BackgroundTransparency = 1
+    lblQuedas.Text                 = "QUEDAS:"
+    lblQuedas.TextColor3           = TEXTO_SEC
+    lblQuedas.Font                 = Enum.Font.GothamBold
+    lblQuedas.TextSize             = 12
+    lblQuedas.TextXAlignment       = Enum.TextXAlignment.Left
+    lblQuedas.Parent               = linhaQuedas
+
+    local containerCirculos = Instance.new("Frame")
+    containerCirculos.Name                 = "CirculosQuedas"
+    containerCirculos.Size                 = UDim2.new(1, -70, 1, 0)
+    containerCirculos.Position             = UDim2.new(0, 70, 0, 0)
+    containerCirculos.BackgroundTransparency = 1
+    containerCirculos.Parent               = linhaQuedas
+
+    local layoutCirculos = Instance.new("UIListLayout", containerCirculos)
+    layoutCirculos.FillDirection       = Enum.FillDirection.Horizontal
+    layoutCirculos.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    layoutCirculos.VerticalAlignment   = Enum.VerticalAlignment.Center
+    layoutCirculos.Padding             = UDim.new(0, 10)
+
+    table.clear(marcadoresQuedas)
+    for i = 1, 3 do
+        local circulo = Instance.new("Frame")
+        circulo.Name             = "MarcadorQueda" .. i
+        circulo.Size             = UDim2.new(0, 20, 0, 20)
+        circulo.BackgroundColor3 = Color3.fromRGB(68, 72, 85)
+        circulo.BorderSizePixel  = 0
+        circulo.LayoutOrder      = i
+        circulo.Parent           = containerCirculos
+        Instance.new("UICorner", circulo).CornerRadius = UDim.new(1, 0)
+
+        local bordaCirculo = Instance.new("UIStroke", circulo)
+        bordaCirculo.Thickness    = 1.5
+        bordaCirculo.Color        = Color3.fromRGB(95, 100, 115)
+        bordaCirculo.Transparency = 0.55
+
+        table.insert(marcadoresQuedas, circulo)
+    end
 
     local textoPlacarJogo = Instance.new("TextLabel")
-    textoPlacarJogo.Size               = UDim2.new(0, 200, 0, 50)
+    textoPlacarJogo.Size               = UDim2.new(0, 200, 0, 46)
     textoPlacarJogo.BackgroundColor3   = BG_PAINEL
     textoPlacarJogo.BackgroundTransparency = 0.2
     textoPlacarJogo.TextColor3         = TEXTO_PRIM
@@ -298,28 +391,28 @@ function UIManager._CriarElementosScore()
     textoPlacarJogo.TextSize           = 20
     textoPlacarJogo.Visible            = false
     textoPlacarJogo.LayoutOrder        = 2
-    textoPlacarJogo.Parent             = containerInfo
+    textoPlacarJogo.Parent             = containerInfoScore
     Instance.new("UICorner", textoPlacarJogo)
     local bordaPlacar = Instance.new("UIStroke", textoPlacarJogo)
     bordaPlacar.Thickness = 1
     bordaPlacar.Color     = Color3.fromRGB(55, 55, 70)
 
     local textoValorRodada = Instance.new("TextLabel")
-    textoValorRodada.Size               = UDim2.new(0, 140, 0, 36)
+    textoValorRodada.Size               = UDim2.new(0, 140, 0, 34)
     textoValorRodada.BackgroundColor3   = BG_PAINEL
     textoValorRodada.BackgroundTransparency = 0.2
     textoValorRodada.TextColor3         = TEXTO_PRIM
     textoValorRodada.Font               = Enum.Font.GothamBold
     textoValorRodada.TextScaled         = false
-    textoValorRodada.TextSize           = 20
+    textoValorRodada.TextSize           = 18
     textoValorRodada.Visible            = false
     textoValorRodada.LayoutOrder        = 3
-    textoValorRodada.Parent             = containerInfo
+    textoValorRodada.Parent             = containerInfoScore
     Instance.new("UICorner", textoValorRodada)
 
     painelVira = Instance.new("Frame")
     painelVira.Name            = "ViraDisplayFrame"
-    painelVira.Size            = UDim2.new(0, 110, 0, 160)
+    painelVira.Size            = UDim2.new(0, 98, 0, 140)
     painelVira.Position        = UDim2.new(1, -16, 0, 60)
     painelVira.AnchorPoint     = Vector2.new(1, 0)
     painelVira.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
@@ -331,6 +424,29 @@ function UIManager._CriarElementosScore()
     bordaVira.Thickness = 1
     bordaVira.Color     = Color3.fromRGB(55, 55, 70)
 
+    registrarLayoutResponsivo(function()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        local ehMobile = (vp.Y < 520 or vp.X < 600)
+
+        local larguraInfo = ehMobile and 172 or 200
+        containerInfoScore.Size = UDim2.new(0, larguraInfo + 10, 0.5, 0)
+        painelEstatisticas.Size = UDim2.new(0, larguraInfo, 0, ehMobile and 64 or 74)
+        textoEstatisticas.TextSize = ehMobile and 13 or 14
+        textoPlacarJogo.Size = UDim2.new(0, larguraInfo, 0, ehMobile and 38 or 46)
+        textoPlacarJogo.TextSize = ehMobile and 17 or 20
+        textoValorRodada.Size = UDim2.new(0, ehMobile and 116 or 140, 0, ehMobile and 28 or 34)
+        textoValorRodada.TextSize = ehMobile and 15 or 18
+
+        if ehMobile then
+            painelVira.Size = UDim2.new(0, 74, 0, 102)
+            painelVira.Position = UDim2.new(1, -14, 0, 52)
+        else
+            painelVira.Size = UDim2.new(0, 98, 0, 140)
+            painelVira.Position = UDim2.new(1, -16, 0, 60)
+        end
+    end)
+
     return {
         textoCronometro    = textoCronometro,
         textoPlacarJogo    = textoPlacarJogo,
@@ -338,6 +454,7 @@ function UIManager._CriarElementosScore()
         textoEstatisticas  = textoEstatisticas,
         painelEstatisticas = painelEstatisticas,
         painelVira         = painelVira,
+        marcadoresQuedas   = marcadoresQuedas,
     }
 end
 
@@ -348,9 +465,9 @@ end
 function UIManager._CriarBtnTruco()
     btnTruco = Instance.new("TextButton")
     btnTruco.Name            = "BtnTruco"
-    btnTruco.Size            = UDim2.new(0, 100, 0, 52)
-    btnTruco.Position        = UDim2.new(0.85, 0, 0.88, 0)
-    btnTruco.AnchorPoint     = Vector2.new(0.5, 0.5)
+    btnTruco.Size            = UDim2.new(0, 106, 0, 52)
+    btnTruco.Position        = UDim2.new(1, -22, 1, -24)
+    btnTruco.AnchorPoint     = Vector2.new(1, 1)
     btnTruco.BackgroundColor3 = Color3.fromRGB(210, 35, 35)
     btnTruco.Text            = "TRUCO!"
     btnTruco.TextColor3      = TEXTO_PRIM
@@ -369,9 +486,139 @@ function UIManager._CriarBtnTruco()
     local tsConstraint = Instance.new("UITextSizeConstraint", btnTruco)
     tsConstraint.MaxTextSize = 20
 
+    registrarLayoutResponsivo(function()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        if vp.X < 520 then
+            btnTruco.Size = UDim2.new(0, 96, 0, 44)
+            btnTruco.Position = UDim2.new(1, -12, 1, -150)
+        elseif vp.Y < 520 then
+            btnTruco.Size = UDim2.new(0, 94, 0, 44)
+            btnTruco.Position = UDim2.new(1, -14, 1, -64)
+        else
+            btnTruco.Size = UDim2.new(0, 108, 0, 52)
+            btnTruco.Position = UDim2.new(1, -24, 1, -76)
+        end
+    end)
+
     btnTruco.Activated:Connect(function()
         Eventos.TrucoEvent:FireServer("Request")
         UIManager.PermitirTruco(false)
+    end)
+end
+
+-- ==========================================
+-- CONTROLES DE CÂMERA E GRADE 2D OPCIONAL
+-- ==========================================
+
+function UIManager._CriarControlesMesa()
+    painelControlesMesa = Instance.new("Frame")
+    painelControlesMesa.Name                 = "PainelControlesMesa"
+    painelControlesMesa.Size                 = UDim2.new(0, 96, 0, 42)
+    painelControlesMesa.Position             = UDim2.new(1, -124, 0, 60)
+    painelControlesMesa.AnchorPoint          = Vector2.new(1, 0)
+    painelControlesMesa.BackgroundTransparency = 1
+    painelControlesMesa.Visible              = false
+    painelControlesMesa.ZIndex               = 25
+    painelControlesMesa.Parent               = painelTela
+
+    local layout = Instance.new("UIListLayout", painelControlesMesa)
+    layout.FillDirection       = Enum.FillDirection.Horizontal
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    layout.VerticalAlignment   = Enum.VerticalAlignment.Top
+    layout.Padding             = UDim.new(0, 8)
+
+    local function criarBotaoControle(nome, icone, layoutOrder, largura)
+        local btn = Instance.new("TextButton")
+        btn.Name                   = nome
+        btn.Size                   = UDim2.new(0, largura or 42, 0, 38)
+        btn.BackgroundColor3       = Color3.fromRGB(28, 28, 36)
+        btn.BackgroundTransparency = 0.18
+        btn.Text                   = icone
+        btn.TextSize               = 14
+        btn.TextColor3             = TEXTO_PRIM
+        btn.Font                   = Enum.Font.GothamBold
+        btn.AutoButtonColor        = true
+        btn.LayoutOrder            = layoutOrder
+        btn.ZIndex                 = 26
+        btn.Parent                 = painelControlesMesa
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+        local borda = Instance.new("UIStroke", btn)
+        borda.Thickness    = 1.4
+        borda.Color        = Color3.new(1, 1, 1)
+        borda.Transparency = 0.72
+        return btn, borda
+    end
+
+    local bordaCam
+    btnCamera, bordaCam = criarBotaoControle("BtnCameraLivre", "📷 Livre", 1, 92)
+    local borda2D
+    btnGrade2D, borda2D = criarBotaoControle("BtnGrade2DOpcional", "🃏", 2, 38)
+    btnGrade2D.TextSize = 18
+
+    local function sincronizarBotaoCamera(cameraLivre)
+        if not btnCamera then return end
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        if vp.X < 520 then
+            btnCamera.Size = UDim2.new(0, 38, 0, 38)
+            btnCamera.Text = cameraLivre and "🎯" or "📷"
+            btnCamera.TextSize = 18
+        else
+            btnCamera.Size = UDim2.new(0, 92, 0, 38)
+            btnCamera.Text = cameraLivre and "🎯 Mesa" or "📷 Livre"
+            btnCamera.TextSize = 13
+        end
+        btnCamera.BackgroundColor3 = cameraLivre and Color3.fromRGB(52, 42, 22) or Color3.fromRGB(28, 28, 36)
+        if bordaCam then
+            bordaCam.Color = cameraLivre and ACENTO or Color3.new(1, 1, 1)
+            bordaCam.Transparency = cameraLivre and 0.15 or 0.72
+        end
+    end
+
+    local function sincronizarBotao2D(ativo)
+        if not btnGrade2D then return end
+        btnGrade2D.BackgroundColor3 = ativo and Color3.fromRGB(28, 56, 42) or Color3.fromRGB(28, 28, 36)
+        if borda2D then
+            borda2D.Color = ativo and VERDE or Color3.new(1, 1, 1)
+            borda2D.Transparency = ativo and 0.15 or 0.72
+        end
+    end
+    atualizarVisualGrade2D = sincronizarBotao2D
+
+    btnCamera.Activated:Connect(function()
+        CameraManager.AlternarCameraLivre()
+    end)
+
+    btnGrade2D.Activated:Connect(function()
+        local ativo = TableUI.AlternarVisivel()
+        sincronizarBotao2D(ativo)
+    end)
+
+    CameraManager.AoMudarModoCamera(function(cameraLivre)
+        sincronizarBotaoCamera(cameraLivre)
+    end)
+    sincronizarBotaoCamera(false)
+    sincronizarBotao2D(false)
+
+    registrarLayoutResponsivo(function()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        sincronizarBotaoCamera(CameraManager.EstaCameraLivre())
+        if vp.X < 520 then
+            layout.FillDirection = Enum.FillDirection.Vertical
+            painelControlesMesa.Size = UDim2.new(0, 42, 0, 86)
+            painelControlesMesa.Position = UDim2.new(1, -14, 0, 162)
+        elseif vp.Y < 520 then
+            layout.FillDirection = Enum.FillDirection.Horizontal
+            painelControlesMesa.Size = UDim2.new(0, 140, 0, 40)
+            painelControlesMesa.Position = UDim2.new(1, -96, 0, 52)
+        else
+            layout.FillDirection = Enum.FillDirection.Horizontal
+            painelControlesMesa.Size = UDim2.new(0, 140, 0, 40)
+            painelControlesMesa.Position = UDim2.new(1, -124, 0, 60)
+        end
     end)
 end
 
@@ -382,8 +629,8 @@ end
 function UIManager._CriarBotoesEmote()
     painelEmotes = Instance.new("Frame")
     painelEmotes.Name               = "PainelEmotes"
-    painelEmotes.Size               = UDim2.new(0, 50, 0, 110)
-    painelEmotes.Position           = UDim2.new(1, -16, 0.65, 0)
+    painelEmotes.Size               = UDim2.new(0, 50, 0, 104)
+    painelEmotes.Position           = UDim2.new(1, -16, 0.58, 0)
     painelEmotes.AnchorPoint        = Vector2.new(1, 0.5)
     painelEmotes.BackgroundTransparency = 1
     painelEmotes.Visible            = false
@@ -392,16 +639,16 @@ function UIManager._CriarBotoesEmote()
 
     local layout = Instance.new("UIListLayout", painelEmotes)
     layout.FillDirection       = Enum.FillDirection.Vertical
-    layout.Padding             = UDim.new(0, 10)
+    layout.Padding             = UDim.new(0, 8)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
     local function criarBotaoEmote(icone, nomeSinal)
         local btn = Instance.new("TextButton")
-        btn.Size            = UDim2.new(0, 46, 0, 46)
+        btn.Size            = UDim2.new(0, 44, 0, 44)
         btn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
         btn.BackgroundTransparency = 0.25
         btn.Text            = icone
-        btn.TextSize        = 24
+        btn.TextSize        = 22
         btn.TextColor3      = TEXTO_PRIM
         btn.AutoButtonColor = true
         btn.Parent          = painelEmotes
@@ -419,6 +666,21 @@ function UIManager._CriarBotoesEmote()
 
     criarBotaoEmote("🖐️", "Sinal_Mao")
     criarBotaoEmote("👀", "Sinal_Olhar")
+
+    registrarLayoutResponsivo(function()
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        if vp.X < 520 then
+            painelEmotes.Position = UDim2.new(1, -14, 0, 266)
+            painelEmotes.AnchorPoint = Vector2.new(1, 0)
+        elseif vp.Y < 520 then
+            painelEmotes.Position = UDim2.new(1, -14, 0.58, 0)
+            painelEmotes.AnchorPoint = Vector2.new(1, 0.5)
+        else
+            painelEmotes.Position = UDim2.new(1, -16, 0.58, 0)
+            painelEmotes.AnchorPoint = Vector2.new(1, 0.5)
+        end
+    end)
 end
 
 function UIManager.PermitirTruco(permitido)
@@ -429,14 +691,14 @@ end
 function UIManager.DefinirVira(val, naipe)
     if not painelVira then return end
     for _, filho in ipairs(painelVira:GetChildren()) do
-        if not filho:IsA("UICorner") then filho:Destroy() end
+        if not filho:IsA("UICorner") and not filho:IsA("UIStroke") then filho:Destroy() end
     end
 
     viraAtual = { valor = val, naipe = naipe }
     painelVira.Visible = estaSentado
     local tituloLbl = Instance.new("TextLabel")
     tituloLbl.Text               = "VIRA"
-    tituloLbl.Size               = UDim2.new(1, 0, 0.2, 0)
+    tituloLbl.Size               = UDim2.new(1, 0, 0.18, 0)
     tituloLbl.BackgroundTransparency = 1
     tituloLbl.TextColor3         = Color3.fromRGB(255, 215, 0)
     tituloLbl.Font               = Enum.Font.GothamBlack
@@ -444,25 +706,28 @@ function UIManager.DefinirVira(val, naipe)
     tituloLbl.Parent             = painelVira
 
     local imgVira = Instance.new("ImageLabel")
-    imgVira.Size             = UDim2.new(0, 80, 0, 115)
+    imgVira.Size             = UDim2.new(0.72, 0, 0.62, 0)
     imgVira.Position         = UDim2.new(0.5, 0, 0.5, 0)
     imgVira.AnchorPoint      = Vector2.new(0.5, 0.5)
     imgVira.BackgroundTransparency = 1
     imgVira.Parent           = painelVira
+    local ratio = Instance.new("UIAspectRatioConstraint", imgVira)
+    ratio.AspectRatio = 93 / 133
     imgViraAtual             = imgVira
 
     CardSettings.AplicarSkinCarta(imgVira, val, naipe, false, dadosJogador.SkinEquipada or "Padrao")
 
     local textoCarta = Instance.new("TextLabel")
     textoCarta.Text               = val .. " " .. naipe
-    textoCarta.Size               = UDim2.new(1, 0, 0.2, 0)
-    textoCarta.Position           = UDim2.new(0, 0, 0.8, 0)
+    textoCarta.Size               = UDim2.new(1, 0, 0.18, 0)
+    textoCarta.Position           = UDim2.new(0, 0, 0.82, 0)
     textoCarta.BackgroundTransparency = 1
     textoCarta.TextColor3         = TEXTO_PRIM
     textoCarta.Font               = Enum.Font.GothamBold
-    textoCarta.TextScaled         = false
-    textoCarta.TextSize           = 18
+    textoCarta.TextScaled         = true
     textoCarta.Parent             = painelVira
+    local constraintCarta = Instance.new("UITextSizeConstraint", textoCarta)
+    constraintCarta.MaxTextSize = 16
 end
 
 function UIManager._CriarMenuAdmin()
@@ -907,7 +1172,13 @@ function UIManager.DefinirVisibilidadeUIJogo(visivel)
     end
 end
 
-function UIManager.DefinirMeuAssento(nomeAssento) end
+function UIManager.DefinirMeuAssento(nomeAssento)
+    assentoAtualRef = nomeAssento
+    CameraManager.DefinirMeuAssento(nomeAssento)
+    if estaSentado and mesaAtualRef and nomeAssento then
+        CameraManager.AtivarModoMesa(mesaAtualRef, nomeAssento)
+    end
+end
 
 function UIManager.DefinirCallbackEmote(callback)
     callbackEmote = callback
@@ -947,8 +1218,19 @@ function UIManager.DefinirSentado(s)
     estaSentado = s
     if s then LeaderboardUI.Fechar() end
     if painelEmotes then painelEmotes.Visible = s end
+    if painelControlesMesa then painelControlesMesa.Visible = s end
     if btnTruco    then btnTruco.Visible    = s and eMinhaVez and possoPedirTruco end
-    if not s then UIManager.ResetTotal() end
+    if s then
+        if mesaAtualRef and assentoAtualRef then
+            CameraManager.AtivarModoMesa(mesaAtualRef, assentoAtualRef)
+        end
+    else
+        assentoAtualRef = nil
+        CameraManager.DesativarModoMesa()
+        TableUI.DefinirVisivel(false)
+        if atualizarVisualGrade2D then atualizarVisualGrade2D(false) end
+        UIManager.ResetTotal()
+    end
 end
 
 function UIManager.ResetTotal()
@@ -961,6 +1243,7 @@ function UIManager.ResetTotal()
     ScoreUI.DefinirVisibilidade(false)
     ScoreUI.OcultarPlacar()
     ScoreUI.AtualizarStatus("", 0)
+    ScoreUI.AtualizarEstatisticas("Ninguém", 0, 0, false, nil)
     TrucoUI.Ocultar()
     UIManager.OcultarOpcoesJogada()
     UIManager.OcultarMenuCorte()

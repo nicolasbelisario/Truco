@@ -4,6 +4,7 @@ local TableUI = {}
 
 local centroMesa
 local modoLateral = false
+local gradeVisivel = false
 
 local function atualizarLayoutContainer()
     if not centroMesa then return end
@@ -71,14 +72,35 @@ local function aplicarLayoutSlot(slotCarta)
     end
 end
 
+--[[
+    Inicializa o container opcional da grade 2D de cartas da mesa.
+    Inicia oculto por padrão para priorizar a imersão 3D em TableVisuals.
+]]
 function TableUI.Inicializar(pai)
     centroMesa = Instance.new("Frame")
     centroMesa.Name = "TableCenter"
     centroMesa.BackgroundTransparency = 1
+    centroMesa.Visible = gradeVisivel
     centroMesa.Parent = pai
 
     modoLateral = false
     atualizarLayoutContainer()
+end
+
+function TableUI.DefinirVisivel(ativo)
+    gradeVisivel = (ativo == true)
+    if centroMesa then
+        centroMesa.Visible = gradeVisivel
+    end
+end
+
+function TableUI.EstaVisivel()
+    return gradeVisivel
+end
+
+function TableUI.AlternarVisivel()
+    TableUI.DefinirVisivel(not gradeVisivel)
+    return gradeVisivel
 end
 
 function TableUI.DefinirModoLateral(ativo)

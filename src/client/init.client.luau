@@ -18,52 +18,75 @@ local TEMPO_ESPERA_EMOTE = 3
 local trucoPendente = false
 local placarAtual = { meus = 0, inimigos = 0 }
 local quedasAnteriores = { nossas = 0, inimigas = 0 }
+local historicoQuedasAtual = {}
+local skinEquipadaLocal = "Padrao"
 local valorManilhaAtual = nil
 local ultimoSomResultado = 0
+local ultimaMesaRegistrada = nil
+local ultimoAssentoRegistrado = nil
 
 -- Inicializa a Interface de Usuário e Áudio Centralizado (D-04)
 GerenciadorUI.Inicializar()
 SoundManager.Inicializar()
+GerenciadorUI.AoMudarModoCamera(function(cameraLivre)
+    VisuaisMesa.DefinirOcultarMaoLocal(not cameraLivre)
+end)
 
 -- [MÉTODO] Atualiza o status de sentar do jogador para registrar em qual mesa ele está
 local function atualizarStatusAssento(estaSentado)
-    GerenciadorUI.DefinirSentado(estaSentado)
-    
     if estaSentado then
         local personagem = jogadorLocal.Character
-        if personagem and personagem:FindFirstChild("Humanoid") and personagem.Humanoid.SeatPart then
-            local assento = personagem.Humanoid.SeatPart
+        local humanoide = personagem and personagem:FindFirstChild("Humanoid")
+        local assento = humanoide and humanoide.SeatPart
+        if assento and assento.Parent and assento.Parent.Parent then
             local nomeAssento = assento.Parent.Name -- Ex: Cadeira1
-            local modeloMesa = assento.Parent.Parent.Parent 
-            
-            print("Sentei na mesa:", modeloMesa.Name) 
-            VisuaisMesa.DefinirMesaAtual(modeloMesa)
-            GerenciadorUI.DefinirMesaAtual(modeloMesa)
-            GerenciadorUI.DefinirMeuAssento(nomeAssento)
-            
-            -- Define a equipe baseada no número da cadeira (Ímpar = A, Par = B)
+            local modeloMesa = assento.Parent.Parent.Parent
+            if ultimaMesaRegistrada == modeloMesa and ultimoAssentoRegistrado == nomeAssento then
+                return
+            end
+            ultimaMesaRegistrada = modeloMesa
+            ultimoAssentoRegistrado = nomeAssento
+
+            print("Sentei na mesa:", modeloMesa.Name)
             local numAssento = tonumber(nomeAssento:match("%d+"))
             if numAssento then
                 minhaEquipe = (numAssento % 2 == 1) and "A" or "B"
             end
+
+            VisuaisMesa.DefinirMesaAtual(modeloMesa, nomeAssento)
+            GerenciadorUI.DefinirMesaAtual(modeloMesa)
+            GerenciadorUI.DefinirMeuAssento(nomeAssento)
+            GerenciadorUI.DefinirSentado(true)
         end
     else
-        -- Remove a referência da mesa quando o jogador levanta
+        ultimaMesaRegistrada = nil
+        ultimoAssentoRegistrado = nil
         VisuaisMesa.DefinirMesaAtual(nil)
         GerenciadorUI.DefinirMesaAtual(nil)
+        GerenciadorUI.DefinirSentado(false)
+    end
+end
+
+local function monitorarPersonagemAssento(personagem)
+    local humanoide = personagem:WaitForChild("Humanoid")
+    humanoide:GetPropertyChangedSignal("Sit"):Connect(function()
+        atualizarStatusAssento(humanoide.Sit)
+    end)
+    humanoide:GetPropertyChangedSignal("SeatPart"):Connect(function()
+        if humanoide.Sit and humanoide.SeatPart then
+            atualizarStatusAssento(true)
+        end
+    end)
+    if humanoide.Sit and humanoide.SeatPart then
+        atualizarStatusAssento(true)
     end
 end
 
 -- Monitora quando o personagem é criado para checar quando ele senta
-jogadorLocal.CharacterAdded:Connect(function(personagem)
-    local humanoide = personagem:WaitForChild("Humanoid")
-    humanoide:GetPropertyChangedSignal("Sit"):Connect(function() 
-        atualizarStatusAssento(humanoide.Sit) 
-    end)
-end)
+jogadorLocal.CharacterAdded:Connect(monitorarPersonagemAssento)
 
 if jogadorLocal.Character and jogadorLocal.Character:FindFirstChild("Humanoid") then
-    atualizarStatusAssento(jogadorLocal.Character.Humanoid.Sit)
+    monitorarPersonagemAssento(jogadorLocal.Character)
 end
 
 -- ==========================================
@@ -127,6 +150,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
     -- --- BLOCO DE RODADA E RESULTADOS ---
     elseif mensagem == "DEALING" then
         GerenciadorUI.OcultarMenuCorte()
+        GerenciadorUI.FocarCameraMesa()
         GerenciadorUI.TocarSom("Shuffle")
         local emMaoEspecial = (placarAtual.meus == 11 or placarAtual.inimigos == 11)
             and placarAtual.meus < 12 and placarAtual.inimigos < 12
@@ -136,6 +160,8 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         trucoPendente = false 
         GerenciadorUI.OcultarDesafioTruco()
         GerenciadorUI.ResetarCamera()
+        GerenciadorUI.LimparMao()
+        VisuaisMesa.LimparPartida()
         
         local textoVencedor = ""
         if mensagem == "DRAW_HAND" then
@@ -179,7 +205,28 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         quedasAnteriores.nossas = minhasQuedas
         quedasAnteriores.inimigas = quedasInimigas
 
-        GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, minhasQuedas, quedasInimigas)
+        if type(dados.Historico) == "table" then
+            historicoQuedasAtual = {}
+            for _, eq in ipairs(dados.Historico) do
+                if eq == "DRAW" then
+                    table.insert(historicoQuedasAtual, "CANGA")
+                elseif eq == minhaEquipe then
+                    table.insert(historicoQuedasAtual, "NOS")
+                else
+                    table.insert(historicoQuedasAtual, "ELES")
+                end
+            end
+        else
+            if vencedorQueda == "DRAW" then
+                table.insert(historicoQuedasAtual, "CANGA")
+            elseif vencedorQueda == minhaEquipe then
+                table.insert(historicoQuedasAtual, "NOS")
+            elseif vencedorQueda == "A" or vencedorQueda == "B" then
+                table.insert(historicoQuedasAtual, "ELES")
+            end
+        end
+
+        GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, minhasQuedas, quedasInimigas, historicoQuedasAtual)
         
         GerenciadorUI.LimparMesa()
         VisuaisMesa.LimparMesa()
@@ -205,8 +252,10 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         
     elseif mensagem == "HIDE_GAME_UI" then
         quedasAnteriores = { nossas = 0, inimigas = 0 }
+        historicoQuedasAtual = {}
         valorManilhaAtual = nil
         GerenciadorUI.DefinirModoTensao(false)
+        VisuaisMesa.LimparPartida()
         GerenciadorUI.ResetTotal()
 
     elseif mensagem == "SHOW_GAME_UI" then
@@ -222,6 +271,10 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         end
         
     elseif mensagem == "CUTTING" then
+        historicoQuedasAtual = {}
+        GerenciadorUI.LimparMao()
+        VisuaisMesa.LimparPartida()
+        GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, 0, 0, historicoQuedasAtual)
         GerenciadorUI.AtualizarStatus("Aguardando corte...", 0)
         
     elseif mensagem == "SHOW_ELEVEN_DECISION" then
@@ -242,6 +295,7 @@ end)
 Eventos.DealCards.OnClientEvent:Connect(function(mao, vira, nomeParceiro)
     if nomeParceiro then parceiroAtual = nomeParceiro end
     quedasAnteriores = { nossas = 0, inimigas = 0 }
+    historicoQuedasAtual = {}
 
     local idxVira = vira and table.find(CardSettings.Values, vira.Value)
     if idxVira then
@@ -259,7 +313,10 @@ Eventos.DealCards.OnClientEvent:Connect(function(mao, vira, nomeParceiro)
     VisuaisMesa.LimparMesa()
     
     GerenciadorUI.DefinirVira(vira.Value, vira.Suit)
-    GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, 0, 0)
+    VisuaisMesa.DefinirMonteEVira(vira.Value, vira.Suit, skinEquipadaLocal)
+    VisuaisMesa.InicializarMaosAvatares()
+    GerenciadorUI.FocarCameraMesa()
+    GerenciadorUI.AtualizarEstatisticasRodada(parceiroAtual, 0, 0, historicoQuedasAtual)
     
     for _, carta in ipairs(mao) do
         GerenciadorUI.AdicionarCartaMao(carta)
@@ -267,6 +324,7 @@ Eventos.DealCards.OnClientEvent:Connect(function(mao, vira, nomeParceiro)
 end)
 
 Eventos.UpdateTurnEvent.OnClientEvent:Connect(function(nomeJogador, numeroQueda)
+    VisuaisMesa.AtualizarTurno(nomeJogador)
     GerenciadorUI.AtualizarTurno(nomeJogador, numeroQueda)
 end)
 
@@ -290,6 +348,8 @@ end)
 
 -- Sincroniza os dados do Banco de Dados com a Interface Visual
 Eventos.SyncDataEvent.OnClientEvent:Connect(function(dados)
+    skinEquipadaLocal = (dados and dados.SkinEquipada) or "Padrao"
+    VisuaisMesa.AtualizarSkinVira(skinEquipadaLocal)
     GerenciadorUI.AtualizarDadosJogador(dados)
 end)
 

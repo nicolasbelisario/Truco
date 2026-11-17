@@ -21,6 +21,7 @@ local PADRAO = {
 DataManager.OnStatChanged = nil
 
 function DataManager.CarregarDados(jogador)
+    jogador:SetAttribute("SkinEquipada", PADRAO.SkinEquipada)
     local ok, dados = pcall(function() return TrucoDataStore:GetAsync(jogador.UserId) end)
     if ok then
         local d = dados or {}
@@ -59,7 +60,10 @@ end
 
 function DataManager.Sincronizar(jogador)
     local dados = sessao[jogador]
-    if dados then Eventos.SyncDataEvent:FireClient(jogador, dados) end
+    if dados then
+        jogador:SetAttribute("SkinEquipada", dados.SkinEquipada or PADRAO.SkinEquipada)
+        Eventos.SyncDataEvent:FireClient(jogador, dados)
+    end
 end
 
 function DataManager.AdicionarPontos(jogador, qtd)
