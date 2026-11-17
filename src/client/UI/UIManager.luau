@@ -600,7 +600,7 @@ function UIManager._CriarControlesMesa()
         sincronizarBotaoCamera(cameraLivre)
     end)
     sincronizarBotaoCamera(false)
-    sincronizarBotao2D(false)
+    sincronizarBotao2D(TableUI.EstaVisivel())
 
     registrarLayoutResponsivo(function()
         local cam = workspace.CurrentCamera
@@ -1221,6 +1221,8 @@ function UIManager.DefinirSentado(s)
     if painelControlesMesa then painelControlesMesa.Visible = s end
     if btnTruco    then btnTruco.Visible    = s and eMinhaVez and possoPedirTruco end
     if s then
+        TableUI.DefinirVisivel(true)
+        if atualizarVisualGrade2D then atualizarVisualGrade2D(true) end
         if mesaAtualRef and assentoAtualRef then
             CameraManager.AtivarModoMesa(mesaAtualRef, assentoAtualRef)
         end

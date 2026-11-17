@@ -4,7 +4,7 @@ local TableUI = {}
 
 local centroMesa
 local modoLateral = false
-local gradeVisivel = false
+local gradeVisivel = true
 
 local function atualizarLayoutContainer()
     if not centroMesa then return end
