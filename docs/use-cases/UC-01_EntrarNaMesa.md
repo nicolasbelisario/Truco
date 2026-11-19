@@ -9,23 +9,27 @@
 ## Fluxo Principal
 
 ```
-1. Jogador caminha até uma mesa 3D e senta em uma Seat livre (Cadeira1..Cadeira4)
-2. Servidor detecta alteração em objetoAssento:GetPropertyChangedSignal("Occupant")
-3. Match:ProcessarMudancaAssento() valida que a cadeira não é reservada para Bot
-4. Servidor registra self.Assentos[nomeAssento] = jogador e executa OnPlayerJoin(jogador)
+1. Jogador entra em uma mesa livre via:
+   - ProximityPrompt ("Sentar na Mesa" [E]) em Cadeira1..Cadeira4 (Seat.CanTouch = false evita esbarrões)
+   - Botão "▶ JOGAR AGORA" (Quick Play) ou Modal "🃏 SALAS" (ver UC-15)
+2. Servidor executa Match:SentarJogadorNoAssento() e detecta alteração em objetoAssento:GetPropertyChangedSignal("Occupant")
+3. Match:ProcessarMudancaAssento() valida que a cadeira não é reservada para Bot nem sala privada não autorizada
+4. Servidor registra self.Assentos[nomeAssento] = jogador, atualiza BillboardGui/Prompts e executa OnPlayerJoin(jogador)
 5. EventBroadcaster envia para o jogador: SHOW_SCOREBOARD, UPDATE_SCORE e WAITING
-6. Cliente (init.client.luau) detecta Humanoid.Sit == true, define a mesa em TableVisuals
-   e calcula minhaEquipe (ímpar = "A", par = "B")
+6. Cliente (init.client.luau) detecta Humanoid.Sit == true, desabilita ProximityPromptService local,
+   oculta barra de lobby, define a mesa em TableVisuals e calcula minhaEquipe (ímpar = "A", par = "B")
 ```
 
 ## Fluxos Alternativos
 
 ### FA-1: Tentativa de sentar em cadeira de Bot
-- Em mesas PvE (`self.UsaBots`), se o número da cadeira estiver em `self.AssentosBots`, o servidor força `humanoide.Jump = true` e não ocupa o assento.
+- Em mesas PvE (`self.UsaBots`), cadeiras de bots possuem `Disabled = true` e não exibem `ProximityPrompt`; se houver tentativa forçada, o servidor força `humanoide.Jump = true` e não ocupa o assento.
 
-### FA-2: Jogador levanta da cadeira
-- `assento.Occupant` torna-se `nil` → servidor executa `OnPlayerLeave`, envia `HIDE_GAME_UI` e limpa `self.Assentos[nomeAssento]`.
-- Se `self.Estado ~= "WAITING"`, o servidor aborta e chama `Match:ResetarPartida("Jogador saiu!")`, destravando os pulos dos demais.
+### FA-2: Jogador levanta da cadeira ou desconecta
+- Em `WAITING` / `COUNTDOWN`: `self.Assentos[nomeAssento]` é limpo, prompts e `BillboardGui` são atualizados (e a contagem é cancelada em `COUNTDOWN`).
+- Em partida ativa (`CUTTING`, `DEALING`, `PLAYING`, `ELEVEN_DECISION`, `SCORING`):
+  - Se ainda houver **ao menos 1 humano** na mesa, o servidor aciona o **Bot Substituto Anti-Abandono (Drop-in)** via `Match:SubstituirPorBotTemporario()` (ver [UC-15](./UC-15_OnboardingMatchmakingDropIn.md)), permitindo que os demais concluam a partida.
+  - Se **0 humanos** restarem, o servidor chama `Match:ResetarPartida("Todos os jogadores saíram.")`.
 
 ---
 

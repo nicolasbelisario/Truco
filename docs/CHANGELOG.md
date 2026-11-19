@@ -8,6 +8,11 @@
 ## [Não Lançado]
 
 ### Implementado / Corrigido
+- 🚀 **Onboarding Rápido ("Jogar Agora"), Matchmaking PvP, ProximityPrompts & Bot Anti-Abandono ([Issue #2](https://github.com/nicolasbelisario/Truco/issues/2) / `UC-15`)**:
+  - **Botão "▶ JOGAR AGORA" (Quick Play) & Painel de Salas (`LobbyUI.luau`)**: barra inferior no lobby com Quick Play prioritário (PvP 3/4 > 2/4 > 1/4 > PvE com espera > Solo 1v3 > demais) e modal `"🃏 SALAS"` com filtros (`Todas`, `PvP Públicas`, `PvE`), entrada por código e criação de salas públicas/privadas com auto-início ao atingir 4 jogadores.
+  - **`ProximityPrompt` nas Cadeiras + `BillboardGui` Dinâmico (`Match.luau`)**: `Seat.CanTouch = false` elimina sentar por esbarrão, `ProximityPrompt` (`"Sentar na Mesa"`) nas cadeiras livres e `BillboardStatusMesa` acima de `Mesa.Topo` exibindo modo (`SOLO 1v3`, `DUPLA 2v2`, `TRIO 3v1`, `PVP 4P`), vagas (`2/4`) e placar ao vivo (`7 x 4`).
+  - **Bot Substituto Anti-Abandono (Drop-in)**: desconexão/saída de humano em partida ativa (`CUTTING`, `DEALING`, `PLAYING`, `ELEVEN_DECISION`, `SCORING`) aciona `Match:SubstituirPorBotTemporario()` quando ainda há humanos na mesa, transferindo mão/mesa/Truco (`RoundManager:SubstituirJogador`, `TrucoHandler:SubstituirJogador`) e limpando bots temporários no reset.
+  - **Rede, Documentação e Testes**: `MatchmakingEvent` e `GetRoomsData` adicionados em `default.project.json` e `TableManager.luau`, caso de uso `UC-15` documentado e testes automatizados adicionados em `test_match_flow.py`.
 - 🧹 **Cleanup no Studio & Mapeamento de Mesas ([Issue #12](https://github.com/nicolasbelisario/Truco/issues/12))**:
   - Mesas PvE em `Workspace.MesasFolder` renomeadas para nomes únicos (`MesaPvE_Solo_1..2`, `MesaPvE_Dupla_1..2`, `MesaPvE_Trio_1..2`) com `Attribute` `TipoMesa` (`PvP`, `MesaPvE_Solo`, `MesaPvE_Dupla`, `MesaPvE_Trio`).
   - `TableManager.luau` atualizado para resolver `CONFIG_BOTS` por `Attribute("TipoMesa")`, nome exato ou prefixo (retrocompatível).
@@ -28,7 +33,6 @@
 
 ### Planejado
 - Sistema de IA dos Bots com estratégia tática real ([Issue #1](https://github.com/nicolasbelisario/Truco/issues/1))
-- Onboarding rápido ("Jogar Agora"), Matchmaking PvP, ProximityPrompts e Bot Anti-Abandono ([Issue #2](https://github.com/nicolasbelisario/Truco/issues/2))
 - Sinais clássicos de Truco, chat rápido seguro e animações de mesa ([Issue #4](https://github.com/nicolasbelisario/Truco/issues/4))
 - Meta-Progressão: Conquistas, Missões Diárias, Daily Login e Win Streak ([Issue #5](https://github.com/nicolasbelisario/Truco/issues/5))
 - Modo Truco Mineiro / Variantes de Regras ([Issue #6](https://github.com/nicolasbelisario/Truco/issues/6))

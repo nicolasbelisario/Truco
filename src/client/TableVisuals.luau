@@ -570,10 +570,12 @@ local function limparTodasMaosAvatares()
 end
 
 local function calcularOffsetsMao3D(total)
+    -- Ângulos em Z positivos inclinam o topo (+Y) para -X e negativos para +X,
+    -- abrindo o leque corretamente no topo (\ | /) com as bases juntas na mão.
     if total == 3 then
-        return { -0.14, 0, 0.14 }, { -16, 0, 16 }
+        return { -0.14, 0, 0.14 }, { 16, 0, -16 }
     elseif total == 2 then
-        return { -0.075, 0.075 }, { -10, 10 }
+        return { -0.075, 0.075 }, { 10, -10 }
     end
     return { 0 }, { 0 }
 end
@@ -611,13 +613,13 @@ local function renderizarMaoAvatar(numAssento)
 
     local baseGrip
     if anchorPart.Name == "UpperTorso" or anchorPart.Name == "Torso" or anchorPart.Name == "HumanoidRootPart" then
-        -- Posiciona o leque à esquerda/ombro do avatar acima da borda da mesa, sem cobrir o rosto
-        baseGrip = CFrame.new(-0.72, dyRel, -1.04) * CFrame.Angles(math.rad(-18), math.rad(14), 0)
+        -- Posiciona o leque à esquerda/ombro do avatar acima da borda da mesa, levemente inclinado para o avatar ler
+        baseGrip = CFrame.new(-0.72, dyRel, -1.04) * CFrame.Angles(math.rad(14), math.rad(14), 0)
     else
         local isRight = (anchorPart.Name == "RightHand" or anchorPart.Name == "Right Arm")
         baseGrip = isRight
-            and (CFrame.new(-0.08, 0.65, -0.45) * CFrame.Angles(math.rad(-20), math.rad(-10), 0))
-            or (CFrame.new(0.08, 0.65, -0.45) * CFrame.Angles(math.rad(-20), math.rad(10), 0))
+            and (CFrame.new(-0.08, 0.65, -0.45) * CFrame.Angles(math.rad(16), math.rad(-10), 0))
+            or (CFrame.new(0.08, 0.65, -0.45) * CFrame.Angles(math.rad(16), math.rad(10), 0))
     end
 
     local primeiraCarta = nil
@@ -747,8 +749,14 @@ function VisuaisMesa.DefinirMesaAtual(modelo, nomeAssento)
                 end))
             end
             if caixa then
-                table.insert(conexoesMesa, caixa.ChildAdded:Connect(function()
-                    task.defer(atualizarVisualPlacas)
+                table.insert(conexoesMesa, caixa.ChildAdded:Connect(function(novoFilho)
+                    task.defer(function()
+                        atualizarVisualPlacas()
+                        if novoFilho:IsA("Model") and (contagemCartasAssento[num] or 0) > 0 then
+                            task.wait(0.1)
+                            renderizarMaoAvatar(num)
+                        end
+                    end)
                 end))
                 table.insert(conexoesMesa, caixa.ChildRemoved:Connect(function()
                     task.defer(atualizarVisualPlacas)

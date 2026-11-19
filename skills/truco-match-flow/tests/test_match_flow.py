@@ -280,6 +280,108 @@ class TestTrucoMatchFlow(unittest.TestCase):
         self.assertEqual(resultado, "CORREU")
         self.assertEqual(mao_onze.estado, "SCORING")
 
+    # --- Testes de Quick Play, Salas Privadas e Bot Drop-in Anti-Abandono (UC-15 / Issue #2) ---
+
+    def _pontuar_quick_play(self, mesa, filtro_modo=None):
+        if mesa["estado"] != "WAITING" or mesa.get("privada", False):
+            return -1
+        if mesa["ocupados"] >= 4:
+            return -1
+        if filtro_modo == "PvP" and mesa["usa_bots"]:
+            return -1
+        if filtro_modo == "PvE" and not mesa["usa_bots"]:
+            return -1
+
+        humanos = mesa["humanos"]
+        ocupados = mesa["ocupados"]
+        if not mesa["usa_bots"]:
+            bonus = 15 if mesa.get("sala_custom") else 0
+            if humanos == 3:
+                return 1000 + bonus
+            if humanos == 2:
+                return 800 + bonus
+            if humanos == 1:
+                return 600 + bonus
+            return 100 + bonus
+        else:
+            if humanos > 0:
+                return 500 + (ocupados * 20)
+            qtd_bots = mesa.get("qtd_bots", 0)
+            if qtd_bots == 3:
+                return 450
+            if qtd_bots == 2:
+                return 300
+            return 200
+
+    def test_quick_play_prioriza_pvp_quase_cheia_sobre_pve(self):
+        """Quick Play deve priorizar mesa PvP 3/4 aberta antes de PvP 2/4, PvE Solo ou vazia."""
+        mesas = [
+            {"nome": "Mesa1", "estado": "WAITING", "usa_bots": False, "humanos": 0, "ocupados": 0},
+            {"nome": "MesaPvE_Solo_1", "estado": "WAITING", "usa_bots": True, "qtd_bots": 3, "humanos": 0, "ocupados": 3},
+            {"nome": "Mesa2", "estado": "WAITING", "usa_bots": False, "humanos": 3, "ocupados": 3},
+            {"nome": "Mesa3", "estado": "WAITING", "usa_bots": False, "humanos": 3, "ocupados": 3, "privada": True},
+            {"nome": "Mesa4", "estado": "PLAYING", "usa_bots": False, "humanos": 4, "ocupados": 4},
+        ]
+        melhor = max(mesas, key=lambda m: self._pontuar_quick_play(m))
+        self.assertEqual(melhor["nome"], "Mesa2")
+
+    def test_quick_play_ignora_salas_privadas_e_usa_pve_solo_se_pvp_vazia(self):
+        """Sem humanos esperando em PvP público, Quick Play escolhe PvE Solo (início imediato) e ignora privadas."""
+        mesas = [
+            {"nome": "Mesa1", "estado": "WAITING", "usa_bots": False, "humanos": 0, "ocupados": 0},
+            {"nome": "Mesa2", "estado": "WAITING", "usa_bots": False, "humanos": 3, "ocupados": 3, "privada": True},
+            {"nome": "MesaPvE_Solo_1", "estado": "WAITING", "usa_bots": True, "qtd_bots": 3, "humanos": 0, "ocupados": 3},
+        ]
+        melhor = max(mesas, key=lambda m: self._pontuar_quick_play(m))
+        self.assertEqual(melhor["nome"], "MesaPvE_Solo_1")
+
+    def test_bot_drop_in_mantem_partida_ativa_quando_restam_humanos(self):
+        """Desconexão de 1 humano durante PLAYING/ELEVEN_DECISION aciona Bot temporário e preserva a mão."""
+        assentos = {
+            "Cadeira1": {"nome": "P1", "bot": False},
+            "Cadeira2": {"nome": "P2", "bot": False},
+            "Cadeira3": {"nome": "P3", "bot": False},
+            "Cadeira4": {"nome": "P4", "bot": False},
+        }
+        maos = {"P2": ["4_Paus", "3_Copas"]}
+        bots_temporarios = {}
+        estado = "PLAYING"
+
+        # Simula desconexão de P2
+        saiu = assentos.pop("Cadeira2")
+        humanos_restantes = [p for p in assentos.values() if not p["bot"]]
+        self.assertEqual(len(humanos_restantes), 3)
+
+        # Aciona drop-in em vez de resetar
+        bot_sub = {"nome": f"[BOT] {saiu['nome']}", "bot": True, "temporario": True}
+        assentos["Cadeira2"] = bot_sub
+        bots_temporarios["Cadeira2"] = bot_sub
+        maos[bot_sub["nome"]] = maos.pop(saiu["nome"])
+
+        self.assertEqual(estado, "PLAYING")
+        self.assertIn("Cadeira2", bots_temporarios)
+        self.assertEqual(maos["[BOT] P2"], ["4_Paus", "3_Copas"])
+
+        # Limpeza no reset remove bots temporários
+        for cadeira in list(bots_temporarios.keys()):
+            del assentos[cadeira]
+            del bots_temporarios[cadeira]
+        self.assertNotIn("Cadeira2", assentos)
+        self.assertEqual(len(bots_temporarios), 0)
+
+    def test_saida_do_ultimo_humano_reseta_partida(self):
+        """Se o último humano (ex: PvE Solo 1v3) desconectar durante partida ativa, a partida deve resetar."""
+        assentos = {
+            "Cadeira1": {"nome": "P1", "bot": False},
+            "Cadeira2": {"nome": "Bot Rival 1", "bot": True},
+            "Cadeira3": {"nome": "Bot Parceiro", "bot": True},
+            "Cadeira4": {"nome": "Bot Rival 2", "bot": True},
+        }
+        assentos.pop("Cadeira1")
+        humanos_restantes = [p for p in assentos.values() if not p["bot"]]
+        deve_resetar = len(humanos_restantes) == 0
+        self.assertTrue(deve_resetar)
+
 
 if __name__ == "__main__":
     unittest.main()

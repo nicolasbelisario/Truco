@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local Players = game:GetService("Players")
 local jogadorLocal = Players.LocalPlayer
 
@@ -24,6 +25,30 @@ local valorManilhaAtual = nil
 local ultimoSomResultado = 0
 local ultimaMesaRegistrada = nil
 local ultimoAssentoRegistrado = nil
+local baloesMesasVisiveis = true
+
+-- Oculta ou restaura localmente todos os BillboardStatusMesa das mesas para manter a visão limpa durante a partida
+local function definirVisibilidadeBaloesMesas(visivel)
+    if baloesMesasVisiveis == visivel then return end
+    baloesMesasVisiveis = visivel
+    local pastaMesas = workspace:FindFirstChild("MesasFolder")
+    if not pastaMesas then return end
+    for _, desc in ipairs(pastaMesas:GetDescendants()) do
+        if desc:IsA("BillboardGui") and desc.Name == "BillboardStatusMesa" then
+            desc.Enabled = visivel
+        end
+    end
+end
+
+task.spawn(function()
+    local pastaMesas = workspace:WaitForChild("MesasFolder", 10)
+    if not pastaMesas then return end
+    pastaMesas.DescendantAdded:Connect(function(desc)
+        if desc:IsA("BillboardGui") and desc.Name == "BillboardStatusMesa" then
+            desc.Enabled = baloesMesasVisiveis
+        end
+    end)
+end)
 
 -- Inicializa a Interface de Usuário e Áudio Centralizado (D-04)
 GerenciadorUI.Inicializar()
@@ -57,6 +82,7 @@ local function atualizarStatusAssento(estaSentado)
             GerenciadorUI.DefinirMesaAtual(modeloMesa)
             GerenciadorUI.DefinirMeuAssento(nomeAssento)
             GerenciadorUI.DefinirSentado(true)
+            ProximityPromptService.Enabled = false
         end
     else
         ultimaMesaRegistrada = nil
@@ -64,6 +90,8 @@ local function atualizarStatusAssento(estaSentado)
         VisuaisMesa.DefinirMesaAtual(nil)
         GerenciadorUI.DefinirMesaAtual(nil)
         GerenciadorUI.DefinirSentado(false)
+        ProximityPromptService.Enabled = true
+        definirVisibilidadeBaloesMesas(true)
     end
 end
 
@@ -149,6 +177,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
 
     -- --- BLOCO DE RODADA E RESULTADOS ---
     elseif mensagem == "DEALING" then
+        definirVisibilidadeBaloesMesas(false)
         GerenciadorUI.OcultarMenuCorte()
         GerenciadorUI.FocarCameraMesa()
         GerenciadorUI.TocarSom("Shuffle")
@@ -251,6 +280,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.OcultarPlacar()
         
     elseif mensagem == "HIDE_GAME_UI" then
+        definirVisibilidadeBaloesMesas(true)
         quedasAnteriores = { nossas = 0, inimigas = 0 }
         historicoQuedasAtual = {}
         valorManilhaAtual = nil
@@ -259,6 +289,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.ResetTotal()
 
     elseif mensagem == "SHOW_GAME_UI" then
+        definirVisibilidadeBaloesMesas(false)
         GerenciadorUI.DefinirVisibilidadeUIJogo(true)
 
     elseif mensagem == "MATCH_WON" then
@@ -271,6 +302,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         end
         
     elseif mensagem == "CUTTING" then
+        definirVisibilidadeBaloesMesas(false)
         historicoQuedasAtual = {}
         GerenciadorUI.LimparMao()
         VisuaisMesa.LimparPartida()
@@ -278,6 +310,7 @@ Eventos.GameStatusEvent.OnClientEvent:Connect(function(mensagem, dados)
         GerenciadorUI.AtualizarStatus("Aguardando corte...", 0)
         
     elseif mensagem == "SHOW_ELEVEN_DECISION" then
+        definirVisibilidadeBaloesMesas(false)
         GerenciadorUI.MostrarDecisaoMaoDeOnze(dados)
         GerenciadorUI.DefinirModoTensao(true)
 

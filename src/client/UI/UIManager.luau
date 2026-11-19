@@ -28,6 +28,7 @@ local SoundManager = require(script.Parent.SoundManager)
 local AudioUI      = require(script.Parent.AudioUI)
 local CameraManager = require(script.Parent.CameraManager)
 local LeaderboardUI = require(script.Parent.LeaderboardUI)
+local LobbyUI       = require(script.Parent.LobbyUI)
 
 local Eventos      = ReplicatedStorage:WaitForChild("Events")
 local jogadorLocal = game:GetService("Players").LocalPlayer
@@ -129,8 +130,10 @@ function UIManager.Inicializar()
     ShopUI.Inicializar(painelTela, barraMenuPrincipal)
     TutorialUI.Inicializar(painelTela, barraMenuPrincipal)
     AudioUI.Inicializar(painelTela, barraMenuPrincipal, SoundManager)
+    LobbyUI.Inicializar(painelTela)
 
     UIManager.LeaderboardUI = LeaderboardUI
+    UIManager.LobbyUI = LobbyUI
 
     -- Inicializado depois das cartas para garantir que o pop-up fique por cima
     TrucoUI.Inicializar(painelTela, CameraManager)
@@ -1165,6 +1168,7 @@ end
 
 function UIManager.DefinirVisibilidadeUIJogo(visivel)
     ScoreUI.DefinirVisibilidade(visivel)
+    if visivel then LobbyUI.OcultarCodigoPrivado() end
     if btnTruco then btnTruco.Visible = false end
     if painelCorte then painelCorte.Visible = false end
     if not visivel then
@@ -1216,6 +1220,7 @@ end
 
 function UIManager.DefinirSentado(s)
     estaSentado = s
+    LobbyUI.DefinirSentado(s)
     if s then LeaderboardUI.Fechar() end
     if painelEmotes then painelEmotes.Visible = s end
     if painelControlesMesa then painelControlesMesa.Visible = s end

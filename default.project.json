@@ -17,7 +17,9 @@
         "SyncDataEvent": { "$className": "RemoteEvent" },
         "ShopActionEvent": { "$className": "RemoteEvent" },
         "AdminActionEvent": { "$className": "RemoteEvent" },
-        "GetLeaderboardData": { "$className": "RemoteFunction" }
+        "MatchmakingEvent": { "$className": "RemoteEvent" },
+        "GetLeaderboardData": { "$className": "RemoteFunction" },
+        "GetRoomsData": { "$className": "RemoteFunction" }
       },
       "Shared": {
         "$path": "src/shared"

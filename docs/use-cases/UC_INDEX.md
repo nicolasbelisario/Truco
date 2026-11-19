@@ -34,13 +34,13 @@
 | [UC-12](./UC-12_EquiparSkin.md) | Equipar Skin | Jogador | ✅ Implementado |
 | [UC-13](./UC-13_EmitirSinal.md) | Emitir Sinal / Emote | Jogador | ✅ Implementado |
 | [UC-14](./UC-14_CortarBaralho.md) | Cortar Baralho | Jogador / Bot | ✅ Implementado |
+| [UC-15](./UC-15_OnboardingMatchmakingDropIn.md) | Onboarding Rápido ("Jogar Agora"), Matchmaking PvP, ProximityPrompts & Bot Drop-in | Jogador / Servidor | ✅ Implementado |
 | [UC-17](./UC-17_VisualizarRankingGlobal.md) | Visualizar Ranking Global | Jogador | ✅ Implementado |
 
 ## Use Cases Planejados (Backlog)
 
 | ID | Nome | Ator | Issue |
 |----|------|------|-------|
-| UC-15 | Onboarding Rápido ("Jogar Agora"), Matchmaking PvP & Bot Drop-in | Jogador / Servidor | [#2](https://github.com/nicolasbelisario/Truco/issues/2) |
 | UC-16 | Partidas Privadas com Convite de Amigos | Jogador | [#9](https://github.com/nicolasbelisario/Truco/issues/9) |
 | UC-18 | Meta-Progressão: Conquistas, Missões Diárias & Win Streak | Servidor / Jogador | [#5](https://github.com/nicolasbelisario/Truco/issues/5) |
 | UC-19 | Onboarding: Destaque de Manilhas & Tutorial 1ª Sessão | Jogador | [#8](https://github.com/nicolasbelisario/Truco/issues/8) |

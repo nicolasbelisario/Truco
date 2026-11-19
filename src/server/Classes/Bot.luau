@@ -5,7 +5,7 @@ local Bot = {}
 Bot.__index = Bot
 
 -- [MÉTODO] Cria uma nova instância de um Bot na cadeira especificada
-function Bot.novo(nome, nomeAssento, instanciaPartida, dificuldade)
+function Bot.novo(nome, nomeAssento, instanciaPartida, dificuldade, temporario)
     local self = setmetatable({}, Bot)
     self.Nome = nome -- Nome de exibição (ex: "Bot Rival 1")
     self.NomeAssento = nomeAssento -- "Cadeira2", "Cadeira3", etc.
@@ -13,8 +13,14 @@ function Bot.novo(nome, nomeAssento, instanciaPartida, dificuldade)
     self.Dificuldade = dificuldade or BotConfig.DificuldadeAtiva
     self.Mao = {} -- Cartas do bot
     self.EBot = true -- Identificador para o sistema saber que não é humano
+    self.Temporario = temporario == true -- Bot substituto (drop-in anti-abandono)
     self.Character = nil -- Bots não têm avatar físico complexo no servidor
     return self
+end
+
+-- Verifica se este bot ainda ocupa validamente seu assento na partida
+function Bot:EstaAtivoNaPartida()
+    return self.Partida ~= nil and self.Partida.Assentos[self.NomeAssento] == self
 end
 
 
@@ -38,8 +44,11 @@ function Bot:JogarTurno(numeroQueda, vira, cartasNaMesa, valorMao, valorTruco)
     local tempoMax = BotConfig.TempoPensamento.MaxSegundos
 
     -- Simula um tempo de "pensamento"
+    local idPartidaCaptura = self.Partida and self.Partida.IDPartida
     task.delay(tempoMin + math.random() * (tempoMax - tempoMin), function()
-        if not self.Partida or self.Partida.Estado ~= "PLAYING" then return end
+        if not self:EstaAtivoNaPartida() then return end
+        if self.Partida.IDPartida ~= idPartidaCaptura or self.Partida.Estado ~= "PLAYING" then return end
+        if self.Partida.TrucoHandler and self.Partida.TrucoHandler.Estado.AguardandoResposta then return end
         if #self.Mao == 0 then return end
         
         -- 1. Chance de pedir Truco (Blefe ou mão boa)
@@ -68,9 +77,12 @@ function Bot:DecidirTruco(valorProposto, valorAtual)
     local cfgDificuldade = BotConfig.Dificuldades[self.Dificuldade] or BotConfig.Dificuldades.Normal
     local tempoMin = BotConfig.TempoRespostaTruco.MinSegundos
     local tempoMax = BotConfig.TempoRespostaTruco.MaxSegundos
+    local idPartidaCaptura = self.Partida and self.Partida.IDPartida
 
     task.delay(tempoMin + math.random() * (tempoMax - tempoMin), function()
-        if not self.Partida then return end
+        if not self:EstaAtivoNaPartida() then return end
+        if self.Partida.IDPartida ~= idPartidaCaptura then return end
+        if not (self.Partida.TrucoHandler and self.Partida.TrucoHandler.Estado.AguardandoResposta) then return end
         local chance = math.random()
         if chance < cfgDificuldade.ChanceAceitarTruco then
             self.Partida:ProcessarAcaoTruco(self, "Response", "Aceitar")
@@ -82,12 +94,13 @@ end
 
 -- [MÉTODO] Decide se joga ou corre na Mão de Onze
 function Bot:DecidirMaoDeOnze(maoParceiro)
+    if not self:EstaAtivoNaPartida() then return end
     local cfgDificuldade = BotConfig.Dificuldades[self.Dificuldade] or BotConfig.Dificuldades.Normal
     local minForca = cfgDificuldade.MinManilhaStrengthMaoDeOnze
 
     local todasAsCartas = {}
-    for _, c in ipairs(self.Mao) do table.insert(todasAsCartas, c) end
-    for _, c in ipairs(maoParceiro) do table.insert(todasAsCartas, c) end
+    for _, c in ipairs(self.Mao or {}) do table.insert(todasAsCartas, c) end
+    for _, c in ipairs(maoParceiro or {}) do table.insert(todasAsCartas, c) end
 
     local temManilhaForte = false
     for _, carta in ipairs(todasAsCartas) do

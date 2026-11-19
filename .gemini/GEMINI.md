@@ -73,7 +73,7 @@ Mapeamento definido em [default.project.json](../default.project.json):
   - `Utils/`: `DeckManager.luau`, `RuleManager.luau`, `AvatarManager.luau`.
 - **Client (`StarterPlayer.StarterPlayerScripts.Client` → `src/client/`)**:
   - Entrada & Mundo 3D: `init.client.luau`, `TableVisuals.luau`.
-  - `UI/`: `UIManager.luau`, `HandUI.luau`, `TableUI.luau`, `TrucoUI.luau`, `ScoreUI.luau`, `ShopUI.luau`, `LeaderboardUI.luau`, `TutorialUI.luau`, `CameraManager.luau`, `SoundManager.luau`.
+  - `UI/`: `UIManager.luau`, `HandUI.luau`, `TableUI.luau`, `TrucoUI.luau`, `ScoreUI.luau`, `ShopUI.luau`, `LeaderboardUI.luau`, `LobbyUI.luau`, `TutorialUI.luau`, `AudioUI.luau`, `CameraManager.luau`, `SoundManager.luau`.
 
 ---
 
@@ -91,8 +91,10 @@ Mapeamento definido em [default.project.json](../default.project.json):
   - `ShopActionEvent` (C→S: `"Comprar" | "Equipar", skinId`)
   - `SyncDataEvent` (S→C: `dados`)
   - `AdminActionEvent` (C→S: `"Adicionar" | "Remover", alvoNome, quantidadeStr`)
+  - `MatchmakingEvent` (Bidirecional: `"QuickPlay" | "EntrarMesa" | "EntrarPorCodigo" | "CriarSala"` / `"QuickPlayResult" | "RoomListUpdate"`)
 - **RemoteFunctions**:
   - `GetLeaderboardData` (C→S: `categoria: "Vitorias" | "Pontos" | "Robux"`)
+  - `GetRoomsData` (C→S: lista de salas e status ao vivo)
 
 ---
 

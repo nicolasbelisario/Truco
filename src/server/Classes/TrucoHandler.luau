@@ -67,6 +67,26 @@ function TrucoHandler:ProcessarRequest(jogador)
     self:_PedirResposta((minha == "A") and "B" or "A", prox, jogador)
 end
 
+function TrucoHandler:_ExecutarDecisao(jogador, decisao)
+    local ctx = self.Ctx
+    local minha = ctx:ObterEquipe(jogador)
+    if decisao == "Aceitar" then
+        self:_Resolver(true, false)
+    elseif decisao == "Correr" then
+        self:_Resolver(false, true)
+    elseif decisao == "Aumentar" then
+        self.Estado.ValorAtual = self.Estado.ValorPendente
+        ctx:OnValorAtualizado(self.Estado.ValorAtual)
+        local prox = math.min(self.Estado.ValorAtual + 3, 12)
+        self.Estado.EquipePediu = minha
+        self.Estado.ValorPendente = prox
+        self.Estado.Votos = {}
+        self.Estado.IDDesafio += 1
+        EventBroadcaster.ParaTodos(ctx.Assentos, "TRUCO_CALLED", prox, ctx.VerificarBot)
+        self:_PedirResposta((minha == "A") and "B" or "A", prox, jogador)
+    end
+end
+
 --[[
     Processa a resposta de um jogador ao desafio de Truco.
     Pode ser "Aceitar", "Correr" ou "Aumentar".
@@ -83,33 +103,49 @@ function TrucoHandler:ProcessarResponse(jogador, subAcao)
     self.Estado.Votos[jogador] = subAcao
     local parceiro = ctx:ObterParceiro(jogador)
 
-    local function executar(decisao)
-        if decisao == "Aceitar" then
-            self:_Resolver(true, false)
-        elseif decisao == "Correr" then
-            self:_Resolver(false, true)
-        elseif decisao == "Aumentar" then
-            self.Estado.ValorAtual = self.Estado.ValorPendente
-            ctx:OnValorAtualizado(self.Estado.ValorAtual)
-            local prox = math.min(self.Estado.ValorAtual + 3, 12)
-            self.Estado.EquipePediu = minha
-            self.Estado.ValorPendente = prox
-            self.Estado.Votos = {}
-            self.Estado.IDDesafio += 1
-            EventBroadcaster.ParaTodos(ctx.Assentos, "TRUCO_CALLED", prox, ctx.VerificarBot)
-            self:_PedirResposta((minha == "A") and "B" or "A", prox, jogador)
-        end
-    end
-
     if ctx:EBot(parceiro) or not parceiro then
-        executar(subAcao)
+        self:_ExecutarDecisao(jogador, subAcao)
         return
     end
 
     local votoParceiro = self.Estado.Votos[parceiro]
     EventBroadcaster.ParaJogador(parceiro, "PARTNER_VOTED", subAcao, ctx.VerificarBot)
     EventBroadcaster.ParaJogador(jogador, "WAITING_PARTNER", 0, ctx.VerificarBot)
-    if votoParceiro == subAcao then executar(subAcao) end
+    if votoParceiro == subAcao then self:_ExecutarDecisao(jogador, subAcao) end
+end
+
+--[[
+    Atualiza o estado do desafio de Truco quando um humano sai e é substituído por um Bot temporário.
+    Garante que o desafio nunca fique travado esperando voto de quem desconectou.
+]]
+function TrucoHandler:SubstituirJogador(jogadorAntigo, botTemp)
+    if self.Estado.Votos then
+        self.Estado.Votos[jogadorAntigo] = nil
+    end
+
+    if not self.Estado.AguardandoResposta then return end
+
+    local ctx = self.Ctx
+    local equipeBot = ctx:ObterEquipe(botTemp)
+    if equipeBot == self.Estado.EquipePediu then return end
+
+    local parceiro = ctx:ObterParceiro(botTemp)
+    if parceiro and not ctx:EBot(parceiro) then
+        -- Se o parceiro humano já havia votado e aguardava o colega, executa imediatamente
+        local votoParceiro = self.Estado.Votos[parceiro]
+        if votoParceiro then
+            self:_ExecutarDecisao(parceiro, votoParceiro)
+        end
+    else
+        -- Nenhum humano restante na equipe desafiada: aciona o Bot substituto para responder
+        local idAtual = self.Estado.IDDesafio
+        local valorPendente = self.Estado.ValorPendente
+        task.delay(1.5, function()
+            if self.Estado.AguardandoResposta and self.Estado.IDDesafio == idAtual then
+                botTemp:DecidirTruco(valorPendente, ctx:OnObterValorRodada())
+            end
+        end)
+    end
 end
 
 --[[

@@ -16,6 +16,7 @@ flowchart TD
         ScoreUI
         ShopUI
         LeaderboardUI
+        LobbyUI
         TutorialUI
         SoundManager
         CameraManager
@@ -68,11 +69,13 @@ flowchart TD
         ShopActionEvent
         SyncDataEvent
         AdminActionEvent
+        MatchmakingEvent
         GetLeaderboardData
+        GetRoomsData
     end
 
     IC --> UIM & TV
-    UIM --> HandUI & TableUI & TrucoUI & ScoreUI & ShopUI & LeaderboardUI & TutorialUI & SoundManager & CameraManager
+    UIM --> HandUI & TableUI & TrucoUI & ScoreUI & ShopUI & LeaderboardUI & LobbyUI & TutorialUI & SoundManager & CameraManager
 
     MS --> TM & DM & SM & RM & AM & LM
     DM -. OnStatChanged .-> LM
@@ -125,6 +128,7 @@ flowchart TD
 | `UI/ScoreUI.luau` | HUD de cronômetro/status, placar (`JOGO: X x Y`), valor da mão (`VALE: N`), estatísticas de quedas e display da Vira |
 | `UI/ShopUI.luau` | Modal de Loja com abas **PONTOS** (skins via `EconomyConfig.Skins`) e **ROBUX** (produtos via `EconomyConfig.ProdutosRobux`) |
 | `UI/LeaderboardUI.luau` | Botão `🏆` na barra unificada e Modal de Ranking Global com abas (`Vitórias`, `Pontos`, `Apoiadores`) e card de desempenho próprio |
+| `UI/LobbyUI.luau` | Barra de lobby com `"▶ JOGAR AGORA"` (Quick Play), `"🃏 SALAS"`, modal de Matchmaking/Salas Públicas e Privadas, toasts e badge de código privado |
 | `UI/TutorialUI.luau` | Modal com carrossel de 6 slides explicando as regras do Truco Paulista |
 | `UI/CameraManager.luau` | Aplica zoom cinematográfico (`Enum.CameraType.Scriptable`) no autor do pedido de Truco e restaura após decisão |
 | `UI/SoundManager.luau` | Reproduz SFX pontuais (`Shuffle`, `Truco`, `CardPlay`, `Victory`) com suporte a toggle de mudo |
@@ -179,7 +183,9 @@ stateDiagram-v2
 | `SignalEvent` | `RemoteEvent` | `(tipoSinal: "Sinal_Mao"\|"Sinal_Olhar")` | `TableManager` → `Match:TransmitirSinal` |
 | `ShopActionEvent` | `RemoteEvent` | `(acao: "Comprar"\|"Equipar", skinId: string)` | `ShopManager` |
 | `AdminActionEvent` | `RemoteEvent` | `(acao: "Adicionar"\|"Remover", alvoNome: string, quantidadeStr: string)` | `AdminManager` |
+| `MatchmakingEvent` | `RemoteEvent` | `("QuickPlay"\|"EntrarMesa"\|"EntrarPorCodigo"\|"CriarSala", arg1?, arg2?)` | `TableManager` (UC-15) |
 | `GetLeaderboardData` | `RemoteFunction` | `(categoria: "Vitorias"\|"Pontos"\|"Robux")` | `LeaderboardManager` |
+| `GetRoomsData` | `RemoteFunction` | `()` → `SalaResumo[]` | `TableManager` (UC-15) |
 
 ### Servidor → Cliente
 
