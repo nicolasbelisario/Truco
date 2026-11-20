@@ -63,7 +63,12 @@ local function atualizarStatusAssento(estaSentado)
         local personagem = jogadorLocal.Character
         local humanoide = personagem and personagem:FindFirstChild("Humanoid")
         local assento = humanoide and humanoide.SeatPart
-        if assento and assento.Parent and assento.Parent.Parent then
+        local pastaMesas = workspace:FindFirstChild("MesasFolder")
+        -- Ignora assentos decorativos da praça (ex.: bancos sentáveis) que não pertencem a MesasFolder
+        if not (assento and pastaMesas and assento:IsDescendantOf(pastaMesas)) then
+            return
+        end
+        if assento.Parent and assento.Parent.Parent then
             local nomeAssento = assento.Parent.Name -- Ex: Cadeira1
             local modeloMesa = assento.Parent.Parent.Parent
             if ultimaMesaRegistrada == modeloMesa and ultimoAssentoRegistrado == nomeAssento then
@@ -85,6 +90,9 @@ local function atualizarStatusAssento(estaSentado)
             ProximityPromptService.Enabled = false
         end
     else
+        if ultimaMesaRegistrada == nil and ultimoAssentoRegistrado == nil then
+            return
+        end
         ultimaMesaRegistrada = nil
         ultimoAssentoRegistrado = nil
         VisuaisMesa.DefinirMesaAtual(nil)
@@ -417,42 +425,25 @@ end)
 -- BGM e SFX centralizados e gerenciados por SoundManager (D-04 / RN-16)
 
 -- ==========================================
--- SISTEMA DE ZONA DO TUTORIAL
+-- SISTEMA DE QUIOSQUE DO TUTORIAL (APENAS PROXIMITYPROMPT)
 -- ==========================================
-local RunService = game:GetService("RunService")
-local zonaTutorial = workspace.Tutorial:WaitForChild("ZonaTutorial", 10) -- Espera carregar o círculo verde
-local RAIO_ZONA = 8 -- Tamanho do raio em studs (ajuste conforme o tamanho do seu círculo)
+local pastaTutorial = workspace:WaitForChild("Tutorial", 10)
+local promptsConectados = {}
 
-local jogadorNaZona = false
-
-if zonaTutorial then
-    -- Roda uma verificação a cada 0.5 segundos (muito leve para o PC)
-    task.spawn(function()
-        while task.wait(0.5) do
-            local personagem = jogadorLocal.Character
-            if personagem and personagem:FindFirstChild("HumanoidRootPart") then
-                local hrp = personagem.HumanoidRootPart
-                
-                -- Ignora o eixo Y (altura) para que um pulo não feche o menu
-                local posJogador = Vector3.new(hrp.Position.X, 0, hrp.Position.Z)
-                local posZona = Vector3.new(zonaTutorial.Position.X, 0, zonaTutorial.Position.Z)
-                
-                local distancia = (posJogador - posZona).Magnitude
-                
-                if distancia <= RAIO_ZONA then
-                    if not jogadorNaZona then
-                        jogadorNaZona = true
-                        GerenciadorUI.MostrarTutorial(true)
-                    end
-                else
-                    if jogadorNaZona then
-                        jogadorNaZona = false
-                        GerenciadorUI.MostrarTutorial(false)
-                    end
-                end
+local function conectarPromptTutorial(inst)
+    if inst:IsA("ProximityPrompt") and inst.Name == "PromptTutorial" and not promptsConectados[inst] then
+        promptsConectados[inst] = true
+        inst.Triggered:Connect(function(quemAtivou)
+            if quemAtivou == jogadorLocal then
+                GerenciadorUI.MostrarTutorial(true)
             end
-        end
-    end)
-else
-    warn("Não foi possível encontrar a 'ZonaTutorial' no Workspace.")
+        end)
+    end
+end
+
+if pastaTutorial then
+    for _, desc in ipairs(pastaTutorial:GetDescendants()) do
+        conectarPromptTutorial(desc)
+    end
+    pastaTutorial.DescendantAdded:Connect(conectarPromptTutorial)
 end

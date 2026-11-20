@@ -145,6 +145,9 @@ function LeaderboardManager.AtualizarTodosRankings()
     carregarTopRanking(ODS_Robux, "Robux")
     
     LeaderboardManager.AtualizarQuadroFisico()
+    task.spawn(function()
+        LeaderboardManager.AtualizarPodio3D()
+    end)
 end
 
 -- ====================================================================
@@ -209,6 +212,8 @@ function LeaderboardManager._ConfigurarQuadroNoMapa()
     surfaceGuiQuadro.Face = Enum.NormalId.Front
     surfaceGuiQuadro.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
     surfaceGuiQuadro.PixelsPerStud = 50
+    surfaceGuiQuadro.LightInfluence = 0.15
+    surfaceGuiQuadro.Brightness = 0.95
     surfaceGuiQuadro.Parent = boardPart
 
     local container = Instance.new("Frame", surfaceGuiQuadro)
@@ -349,6 +354,184 @@ function LeaderboardManager.AtualizarQuadroFisico()
         lblValor.Font = Enum.Font.GothamBlack
         lblValor.TextSize = 20
         lblValor.TextXAlignment = Enum.TextXAlignment.Right
+    end
+end
+
+-- ====================================================================
+-- PÓDIO 3D DO TOP 3 GLOBAL (AVATARES REAIS DE Leaderboard_Vitorias_v1)
+-- ====================================================================
+
+local ANIMACOES_PODIO_R15 = {
+    [1] = "rbxassetid://507770677", -- Cheer (1º lugar)
+    [2] = "rbxassetid://507766388", -- Idle (2º lugar)
+    [3] = "rbxassetid://507766388", -- Idle (3º lugar)
+}
+
+local estadoPodioAtual = {} -- [rank] = { UserId = number?, Nome = string?, Valor = number? }
+local versaoPodio = 0
+
+local function atualizarPlacaPedestal(pedestal, nomeTexto, vitoriasTexto)
+    if not pedestal then return end
+    local placa = pedestal:FindFirstChild("Placa")
+    local gui = placa and placa:FindFirstChild("PlacaPodioGui")
+    local container = gui and gui:FindFirstChild("Container")
+    if not container then return end
+
+    local lblNome = container:FindFirstChild("LblNome")
+    if lblNome and lblNome:IsA("TextLabel") then
+        lblNome.Text = nomeTexto
+    end
+    local lblVit = container:FindFirstChild("LblVitorias")
+    if lblVit and lblVit:IsA("TextLabel") then
+        lblVit.Text = vitoriasTexto
+    end
+end
+
+local function obterDescricaoAvatarSegura(userId)
+    if type(userId) == "number" and userId > 0 then
+        local ok, desc = pcall(function()
+            return Players:GetHumanoidDescriptionFromUserId(userId)
+        end)
+        if ok and desc then
+            return desc
+        end
+    end
+    return Instance.new("HumanoidDescription")
+end
+
+local function posicionarAvatarNoPedestal(modeloAvatar, pontoCF)
+    local hrp = modeloAvatar:FindFirstChild("HumanoidRootPart")
+    local humanoide = modeloAvatar:FindFirstChildOfClass("Humanoid")
+
+    -- Calcula deslocamento exato do centro do HumanoidRootPart até a sola dos pés
+    local alturaPe = 3.0
+    if hrp and humanoide and humanoide.HipHeight > 0.1 then
+        alturaPe = humanoide.HipHeight + (hrp.Size.Y * 0.5)
+    else
+        local bboxCF, bboxSize = modeloAvatar:GetBoundingBox()
+        local refY = hrp and hrp.Position.Y or bboxCF.Position.Y
+        alturaPe = math.max(refY - (bboxCF.Position.Y - bboxSize.Y * 0.5), 2.5)
+    end
+
+    local destinoCF = pontoCF * CFrame.new(0, alturaPe, 0)
+    if hrp then
+        modeloAvatar.PrimaryPart = hrp
+        modeloAvatar:PivotTo(destinoCF)
+    else
+        modeloAvatar:PivotTo(destinoCF)
+    end
+end
+
+local function aplicarAnimacaoPodio(modeloAvatar, rank)
+    local humanoide = modeloAvatar:FindFirstChildOfClass("Humanoid")
+    if not humanoide then return end
+
+    local animator = humanoide:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = humanoide
+    end
+
+    local animId = ANIMACOES_PODIO_R15[rank] or ANIMACOES_PODIO_R15[2]
+    local anim = Instance.new("Animation")
+    anim.Name = "PodioAnim"
+    anim.AnimationId = animId
+    anim.Parent = modeloAvatar
+
+    pcall(function()
+        local track = animator:LoadAnimation(anim)
+        track.Looped = true
+        track:Play()
+    end)
+end
+
+function LeaderboardManager.AtualizarPodio3D()
+    local podio = workspace:FindFirstChild("PodioTop3", true)
+    if not podio then return end
+
+    versaoPodio += 1
+    local minhaVersao = versaoPodio
+
+    local pastaAvatares = podio:FindFirstChild("AvataresTop3")
+    if not pastaAvatares then
+        pastaAvatares = Instance.new("Folder")
+        pastaAvatares.Name = "AvataresTop3"
+        pastaAvatares.Parent = podio
+    end
+
+    local topVitorias = cacheRanking.Vitorias or {}
+
+    for rank = 1, 3 do
+        if minhaVersao ~= versaoPodio then return end
+
+        local pedestal = podio:FindFirstChild("Pedestal" .. tostring(rank))
+        local pontoAvatar = pedestal and pedestal:FindFirstChild("PontoAvatar")
+        local item = topVitorias[rank]
+        local nomeModelo = "AvatarRank" .. tostring(rank)
+
+        if not item then
+            atualizarPlacaPedestal(pedestal, "Vaga Aberta", "— vitórias")
+            local antigo = pastaAvatares:FindFirstChild(nomeModelo)
+            if antigo then antigo:Destroy() end
+            estadoPodioAtual[rank] = nil
+        else
+            local sufixoVit = (item.Valor == 1) and " vitória" or " vitórias"
+            atualizarPlacaPedestal(pedestal, item.Nome, tostring(item.Valor) .. sufixoVit)
+
+            local anterior = estadoPodioAtual[rank]
+            local jaExiste = pastaAvatares:FindFirstChild(nomeModelo) ~= nil
+
+            -- Só recria o modelo 3D se o UserId mudou ou se o avatar ainda não foi instanciado
+            if (not jaExiste) or (not anterior) or (anterior.UserId ~= item.UserId) then
+                local desc = obterDescricaoAvatarSegura(item.UserId)
+                local okModelo, modeloAvatar = pcall(function()
+                    return Players:CreateHumanoidModelFromDescriptionAsync(desc, Enum.HumanoidRigType.R15)
+                end)
+
+                if minhaVersao ~= versaoPodio then
+                    if okModelo and modeloAvatar then modeloAvatar:Destroy() end
+                    return
+                end
+
+                if okModelo and modeloAvatar and pontoAvatar then
+                    local antigo = pastaAvatares:FindFirstChild(nomeModelo)
+                    if antigo then antigo:Destroy() end
+
+                    modeloAvatar.Name = nomeModelo
+
+                    -- Remove quaisquer scripts internos e desativa colisão para impedir empurrões
+                    for _, descPart in ipairs(modeloAvatar:GetDescendants()) do
+                        if descPart:IsA("BaseScript") then
+                            descPart:Destroy()
+                        elseif descPart:IsA("BasePart") then
+                            descPart.CanCollide = false
+                            descPart.Anchored = (descPart.Name == "HumanoidRootPart")
+                        end
+                    end
+
+                    local humanoide = modeloAvatar:FindFirstChildOfClass("Humanoid")
+                    if humanoide then
+                        humanoide.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                        humanoide.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+                    end
+
+                    modeloAvatar.Parent = pastaAvatares
+                    posicionarAvatarNoPedestal(modeloAvatar, pontoAvatar.CFrame)
+                    aplicarAnimacaoPodio(modeloAvatar, rank)
+
+                    estadoPodioAtual[rank] = {
+                        UserId = item.UserId,
+                        Nome = item.Nome,
+                        Valor = item.Valor,
+                    }
+                elseif not okModelo then
+                    warn("[LeaderboardManager] Falha ao criar avatar 3D do pódio rank " .. rank .. ":", tostring(modeloAvatar))
+                end
+            else
+                estadoPodioAtual[rank].Nome = item.Nome
+                estadoPodioAtual[rank].Valor = item.Valor
+            end
+        end
     end
 end
 

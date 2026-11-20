@@ -227,17 +227,22 @@ Os scripts do projeto dependem diretamente da seguinte estrutura no **Roblox Stu
 
 ```
 Workspace
+├── Cenário/                           (Praça Paulista: calçada de pedra portuguesa, decks, pergolados, luminárias, fontes, casario brasileiro e vegetação)
 ├── MesasFolder/
-│   ├── Mesa1 .. Mesa4                 (Mesas PvP — 4 humanos; Attribute TipoMesa = "PvP")
-│   ├── MesaPvE_Solo_1 .. MesaPvE_Solo_2   (Bots nas cadeiras 2, 3, 4; Attribute TipoMesa = "MesaPvE_Solo")
-│   ├── MesaPvE_Dupla_1 .. MesaPvE_Dupla_2 (Bots nas cadeiras 2, 4; Attribute TipoMesa = "MesaPvE_Dupla")
-│   └── MesaPvE_Trio_1 .. MesaPvE_Trio_2   (Bot na cadeira 4; Attribute TipoMesa = "MesaPvE_Trio")
+│   ├── Mesa1 .. Mesa6                 (6 Mesas PvP — 4 humanos; Attribute TipoMesa = "PvP"; feltro verde esmeralda)
+│   ├── MesaPvE_Solo_1 .. MesaPvE_Solo_2   (Bots nas cadeiras 2, 3, 4; Attribute TipoMesa = "MesaPvE_Solo"; feltro azul)
+│   ├── MesaPvE_Dupla_1 .. MesaPvE_Dupla_2 (Bots nas cadeiras 2, 4; Attribute TipoMesa = "MesaPvE_Dupla"; feltro azul)
+│   └── MesaPvE_Trio_1 .. MesaPvE_Trio_2   (Bot na cadeira 4; Attribute TipoMesa = "MesaPvE_Trio"; feltro azul)
 │       ├── Mesa/Topo                  (BasePart — referência de altura/centro 3D)
 │       ├── Cadeiras/Cadeira1..4       (Cada uma contendo um Seat)
 │       └── CartasNaMesa/              (Folder para Parts das cartas jogadas)
 ├── LeaderboardBoard                   (Part ou Model para SurfaceGui do Top 10)
+├── PodioTop3/                         (Palco/Pódio 3D ao lado do LeaderboardBoard populado por LeaderboardManager)
+│   ├── Pedestal1..3/                  (Contendo Base, Topo, PontoAvatar e Placa/PlacaPodioGui)
+│   └── AvataresTop3/                  (Folder onde os avatares reais do Top 3 de Vitórias são instanciados)
 └── Tutorial/
-    └── ZonaTutorial                   (BasePart — ativa TutorialUI num raio de 8 studs)
+    ├── Barraquinha                    (Quiosque temático de praça)
+    └── copinhodecocacola              (NPC guia com ProximityPrompt `PromptTutorial` para abrir TutorialUI)
 ```
 
 ---
