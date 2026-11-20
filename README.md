@@ -15,13 +15,21 @@ Link do jogo: [Truco Paulista](https://www.roblox.com/games/96367147207107/Truco
 
 ## Demonstração do Jogo
 
-| Lobby | Mesa de Jogo |
-| :---: | :---: |
-| <img width="460.8" height="259.2" alt="Lobby" src="https://github.com/user-attachments/assets/7607e48e-fcbe-44f5-9951-04d28da3be35" /> | <img height="432" alt="Mesa" src="https://github.com/user-attachments/assets/26914ab0-dc98-4350-bb6e-c88b803be50b" />  |
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7cb62acf-1a1b-41fe-bfc1-3bf8201698cd" alt="Praça Paulista e Pódio Top 3 — Truco Paulista no Roblox" width="100%" />
+</p>
 
-| Sistema de Apostas (Truco!) | Visualização das Cartas |
+| Partida 3D na Mesa (Vira, Cartas & Leque) | Ala Clássica — PvP (6 Mesas) |
 | :---: | :---: |
-| <img width="460.8" height="259.2" alt="GritoTruco" src="https://github.com/user-attachments/assets/43945dff-c42d-477d-9b77-f096fc7263cf" />  | <img height="432" alt="Cartas" src="https://github.com/user-attachments/assets/e7b85303-6c49-47ac-8582-718f5414a4d8" /> |
+| <img src="https://github.com/user-attachments/assets/84319f0d-b992-47c8-9d73-ac9fec465b83" alt="Partida 3D na Mesa de Truco" width="100%" /> | <img src="https://github.com/user-attachments/assets/29123fe8-12ac-4ec5-b28c-98106c92a63c" alt="Ala Clássica PvP com 6 mesas de feltro verde" width="100%" /> |
+
+| Ala Treino — PvE com Bots (6 Mesas) | Visão Panorâmica da Praça Paulista |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/8ecb31fa-6d00-4d42-8b6c-562ebcf5ab07" alt="Ala Treino PvE com Bots e placares ao vivo" width="100%" /> | <img src="https://github.com/user-attachments/assets/df6e5ace-c76d-4a24-a279-fcfda8a7c4bd" alt="Visão aérea da Praça Paulista, chafarizes e casario brasileiro" width="100%" /> |
+
+| Recanto Brasileiro (Bancos Sentáveis & Chafariz) | Mesa em Ação (4 Jogadores & Cartas 3D) |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/1c990cab-d28f-4a50-93a4-00dc89eaaa8d" alt="Bancos sentáveis, chafariz animado e casario ao fundo" width="100%" /> | <img src="https://github.com/user-attachments/assets/f09bb95c-f2d9-41ee-abcc-52972abbf05b" alt="Quatro jogadores em partida de Truco com cartas e Vira em 3D" width="100%" /> |
 
 ---
 

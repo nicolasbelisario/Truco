@@ -9,3 +9,7 @@ sourcemap.json
 
 # Ignore png
 *.png
+
+# Ignore local screenshots and thumbnails
+docs/screenshots/
+docs/thumbnails/
