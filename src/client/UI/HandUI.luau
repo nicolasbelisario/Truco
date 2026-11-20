@@ -8,8 +8,10 @@ local eMinhaVez = false
 local numeroQuedaAtual = 1
 local trucoPendente = false
 local dadosJogador = { SkinEquipada = "Padrao" }
+local valorViraAtual = nil
+local filtroClique = nil -- function(card) -> boolean (usado no tutorial interativo)
 
-local cartasAtivas = {} -- lista ordenada de { wrapper, btn, card, baseZ }
+local cartasAtivas = {} -- lista ordenada de { wrapper, btn, card, baseZ, seloFrame, seloLbl, strokeManilha, tweenPulso }
 local connViewport = nil
 
 -- Callbacks injetados (D)
@@ -18,6 +20,117 @@ local onPedirOpcoes   -- function(btnImg, card, container, callbackJogar)
 local onOcultarOpcoes -- function()
 
 local TWEEN_LEQUE = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local TWEEN_PULSO_MANILHA = TweenInfo.new(0.85, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+local COR_OURO_MANILHA = Color3.fromRGB(255, 212, 55)
+
+local function atualizarZIndexEntrada(item, zBase)
+    if item.wrapper then item.wrapper.ZIndex = zBase end
+    if item.btn then item.btn.ZIndex = zBase end
+    if item.seloFrame then item.seloFrame.ZIndex = zBase + 2 end
+    if item.seloLbl then item.seloLbl.ZIndex = zBase + 3 end
+end
+
+local function limparDestaqueManilha(item)
+    if item.tweenPulso then
+        item.tweenPulso:Cancel()
+        item.tweenPulso = nil
+    end
+    if item.strokeManilha then
+        item.strokeManilha:Destroy()
+        item.strokeManilha = nil
+    end
+    if item.seloFrame then
+        item.seloFrame:Destroy()
+        item.seloFrame = nil
+        item.seloLbl = nil
+    end
+end
+
+local function aplicarDestaqueManilha(item)
+    limparDestaqueManilha(item)
+    if not item.btn or not item.btn.Parent or not item.card then return end
+
+    local infoManilha = nil
+    if valorViraAtual then
+        infoManilha = CardSettings.ObterInfoManilha(item.card.Value, item.card.Suit, valorViraAtual)
+    elseif item.card.ManilhaStrength and item.card.ManilhaStrength > 0 then
+        infoManilha = CardSettings.ManilhaInfoPorNaipe[item.card.Suit]
+    end
+
+    if not infoManilha then return end
+
+    -- Borda brilhante dourada animada
+    local stroke = Instance.new("UIStroke")
+    stroke.Name = "BordaManilha"
+    stroke.Color = COR_OURO_MANILHA
+    stroke.Thickness = 2.8
+    stroke.Transparency = 0.05
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = item.btn
+
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 244, 155)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(250, 178, 25)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 244, 155)),
+    })
+    grad.Rotation = 35
+    grad.Parent = stroke
+
+    local tweenPulso = TweenService:Create(stroke, TWEEN_PULSO_MANILHA, {
+        Thickness = 4.0,
+        Transparency = 0.25,
+    })
+    tweenPulso:Play()
+
+    -- Selo discreto no topo-centro da carta (ex.: ZAP ♣️, COPAS ♥️, ESPADAS ♠️, OUROS ♦️)
+    local selo = Instance.new("Frame")
+    selo.Name = "SeloManilha"
+    selo.AnchorPoint = Vector2.new(0.5, 0.5)
+    selo.Position = UDim2.new(0.5, 0, 0, -2)
+    selo.Size = UDim2.new(0.94, 0, 0.16, 0)
+    selo.BackgroundColor3 = Color3.fromRGB(22, 18, 10)
+    selo.BackgroundTransparency = 0.06
+    selo.BorderSizePixel = 0
+    selo.ZIndex = (item.btn.ZIndex or 1) + 2
+    selo.Parent = item.btn
+    Instance.new("UICorner", selo).CornerRadius = UDim.new(1, 0)
+
+    local seloSizeCons = Instance.new("UISizeConstraint", selo)
+    seloSizeCons.MinSize = Vector2.new(54, 16)
+    seloSizeCons.MaxSize = Vector2.new(124, 22)
+
+    local strokeSelo = Instance.new("UIStroke", selo)
+    strokeSelo.Color = COR_OURO_MANILHA
+    strokeSelo.Thickness = 1.4
+    strokeSelo.Transparency = 0.1
+
+    local padSelo = Instance.new("UIPadding", selo)
+    padSelo.PaddingLeft = UDim.new(0, 4)
+    padSelo.PaddingRight = UDim.new(0, 4)
+    padSelo.PaddingTop = UDim.new(0, 1)
+    padSelo.PaddingBottom = UDim.new(0, 1)
+
+    local lblSelo = Instance.new("TextLabel")
+    lblSelo.Name = "TextoSelo"
+    lblSelo.Size = UDim2.new(1, 0, 1, 0)
+    lblSelo.BackgroundTransparency = 1
+    lblSelo.Text = infoManilha.Selo
+    lblSelo.TextColor3 = infoManilha.CorTexto
+    lblSelo.Font = Enum.Font.GothamBlack
+    lblSelo.TextScaled = true
+    lblSelo.ZIndex = (item.btn.ZIndex or 1) + 3
+    lblSelo.Parent = selo
+
+    local limTexto = Instance.new("UITextSizeConstraint", lblSelo)
+    limTexto.MaxTextSize = 11
+    limTexto.MinTextSize = 7
+
+    item.strokeManilha = stroke
+    item.tweenPulso = tweenPulso
+    item.seloFrame = selo
+    item.seloLbl = lblSelo
+end
 
 local function calcularDimensoesCarta()
     local cam = workspace.CurrentCamera
@@ -73,8 +186,7 @@ local function reorganizarLeque(instantaneo)
     local xs, ys, rots = calcularParametrosLeque(total, largura)
     for i, item in ipairs(cartasAtivas) do
         item.baseZ = i
-        item.wrapper.ZIndex = i
-        item.btn.ZIndex = i
+        atualizarZIndexEntrada(item, i)
 
         local tamanhoAlvo = UDim2.new(0, largura, 0, altura)
         local posAlvo = UDim2.new(0.5, xs[i], 1, ys[i])
@@ -116,9 +228,9 @@ function HandUI.Inicializar(pai, callbacks)
 end
 
 function HandUI.DefinirEstado(minhaVez, numQueda, truco, dados)
-    eMinhaVez = minhaVez
-    numeroQuedaAtual = numQueda or 1
-    trucoPendente = truco or false
+    if minhaVez ~= nil then eMinhaVez = minhaVez end
+    if numQueda ~= nil then numeroQuedaAtual = numQueda end
+    if truco ~= nil then trucoPendente = truco end
     if dados then
         dadosJogador = dados
         local skin = dadosJogador.SkinEquipada or "Padrao"
@@ -157,11 +269,17 @@ function HandUI.AdicionarCarta(card)
         btn = btn,
         card = card,
         baseZ = #cartasAtivas + 1,
+        seloFrame = nil,
+        seloLbl = nil,
+        strokeManilha = nil,
+        tweenPulso = nil,
     }
     table.insert(cartasAtivas, entrada)
+    aplicarDestaqueManilha(entrada)
 
     wrapper.AncestryChanged:Connect(function(_, novoPai)
         if not novoPai then
+            limparDestaqueManilha(entrada)
             for idx, item in ipairs(cartasAtivas) do
                 if item == entrada then
                     table.remove(cartasAtivas, idx)
@@ -175,23 +293,21 @@ function HandUI.AdicionarCarta(card)
     end)
 
     btn.MouseEnter:Connect(function()
-        wrapper.ZIndex = 20
-        btn.ZIndex = 20
+        atualizarZIndexEntrada(entrada, 20)
         btn:TweenPosition(UDim2.new(0, 0, -0.18, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.16, true)
     end)
     btn.MouseLeave:Connect(function()
-        wrapper.ZIndex = entrada.baseZ
-        btn.ZIndex = entrada.baseZ
+        atualizarZIndexEntrada(entrada, entrada.baseZ)
         btn:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.16, true)
     end)
 
     btn.Activated:Connect(function()
         if not eMinhaVez then return end
         if trucoPendente then return end
+        if filtroClique and not filtroClique(card) then return end
 
         if numeroQuedaAtual >= 2 then
-            wrapper.ZIndex = 25
-            btn.ZIndex = 25
+            atualizarZIndexEntrada(entrada, 25)
             if onPedirOpcoes then onPedirOpcoes(btn, card, wrapper, onJogarCarta) end
         else
             eMinhaVez = false
@@ -204,7 +320,35 @@ function HandUI.AdicionarCarta(card)
     reorganizarLeque(false)
 end
 
+function HandUI.DefinirVira(vira)
+    if type(vira) == "table" then
+        valorViraAtual = vira.Value or vira.valor
+    else
+        valorViraAtual = vira
+    end
+    for _, item in ipairs(cartasAtivas) do
+        aplicarDestaqueManilha(item)
+        atualizarZIndexEntrada(item, item.baseZ)
+    end
+end
+
+function HandUI.DefinirFiltroClique(fn)
+    filtroClique = fn
+end
+
+function HandUI.ObterElementoCarta(cardId)
+    for _, item in ipairs(cartasAtivas) do
+        if item.card and item.card.idUnico == cardId and item.btn and item.btn.Parent then
+            return item.btn, item.wrapper
+        end
+    end
+    return nil, nil
+end
+
 function HandUI.Limpar()
+    for _, item in ipairs(cartasAtivas) do
+        limparDestaqueManilha(item)
+    end
     table.clear(cartasAtivas)
     if not painelMao then return end
     painelMao:ClearAllChildren()

@@ -23,6 +23,7 @@ local TableUI      = require(script.Parent.TableUI)
 local TrucoUI      = require(script.Parent.TrucoUI)
 local ShopUI       = require(script.Parent.ShopUI)
 local TutorialUI   = require(script.Parent.TutorialUI)
+local TutorialMatch = require(script.Parent.TutorialMatch)
 local ScoreUI      = require(script.Parent.ScoreUI)
 local SoundManager = require(script.Parent.SoundManager)
 local AudioUI      = require(script.Parent.AudioUI)
@@ -41,6 +42,10 @@ local trucoPendente  = false
 local btnTruco
 local mesaAtualRef   = nil
 local assentoAtualRef = nil
+local modoTutorialHandlers = nil
+local boasVindasProcessada = false
+local tutorialEvent = nil
+local matchmakingEvent = nil
 
 -- Variáveis locais resgatadas
 local painelCorte, barraTempoCorte
@@ -74,8 +79,29 @@ local function atualizarLayoutsResponsivos()
     end
 end
 
+local function marcarTutorialVistoNoServidor()
+    local ev = tutorialEvent or Eventos:FindFirstChild("TutorialEvent")
+    if ev then
+        ev:FireServer("MarcarVisto")
+    end
+end
+
+local function irParaMesaSolo()
+    local ev = matchmakingEvent or Eventos:FindFirstChild("MatchmakingEvent")
+    if ev then
+        ev:FireServer("QuickPlay", "PvE_Solo")
+    end
+end
+
 function UIManager.Inicializar()
     local GuiService = game:GetService("GuiService")
+
+    task.spawn(function()
+        tutorialEvent = Eventos:WaitForChild("TutorialEvent", 15)
+    end)
+    task.spawn(function()
+        matchmakingEvent = Eventos:WaitForChild("MatchmakingEvent", 15)
+    end)
 
     painelTela = Instance.new("ScreenGui")
     painelTela.Name           = "TrucoGui"
@@ -117,7 +143,13 @@ function UIManager.Inicializar()
     TableUI.Inicializar(painelTela)
 
     HandUI.Inicializar(painelTela, {
-        onJogarCarta   = function(cardId, escondida) Eventos.PlayCardEvent:FireServer(cardId, escondida) end,
+        onJogarCarta   = function(cardId, escondida)
+            if modoTutorialHandlers and modoTutorialHandlers.onJogarCarta then
+                modoTutorialHandlers.onJogarCarta(cardId, escondida)
+            else
+                Eventos.PlayCardEvent:FireServer(cardId, escondida)
+            end
+        end,
         onPedirOpcoes  = function(btn, card, container, cbJogar) UIManager.MostrarOpcoesJogada(btn, card, container, cbJogar) end,
         onOcultarOpcoes = function() UIManager.OcultarOpcoesJogada() end
     })
@@ -128,7 +160,11 @@ function UIManager.Inicializar()
     SoundManager.Inicializar()
     LeaderboardUI.Inicializar(painelTela, barraMenuPrincipal)
     ShopUI.Inicializar(painelTela, barraMenuPrincipal)
-    TutorialUI.Inicializar(painelTela, barraMenuPrincipal)
+    TutorialUI.Inicializar(painelTela, barraMenuPrincipal, {
+        onIniciarPartidaTutorial = function() UIManager.IniciarPartidaTutorial() end,
+        onIrMesaSolo = irParaMesaSolo,
+        onMarcarVisto = marcarTutorialVistoNoServidor,
+    })
     AudioUI.Inicializar(painelTela, barraMenuPrincipal, SoundManager)
     LobbyUI.Inicializar(painelTela)
 
@@ -144,6 +180,108 @@ function UIManager.Inicializar()
     UIManager._CriarBotoesEmote()
     UIManager._CriarControlesMesa()
     UIManager._CriarMenuMaoDeOnze()
+    UIManager._InicializarPartidaTutorial()
+end
+
+function UIManager._InicializarPartidaTutorial()
+    TutorialMatch.Inicializar(painelTela, {
+        ativarModoTutorial = function(handlers)
+            LeaderboardUI.Fechar()
+            TutorialUI.FecharBoasVindas(false)
+            TutorialUI.Mostrar(false)
+            LobbyUI.DefinirSentado(true)
+            TableUI.DefinirVisivel(true)
+            ScoreUI.DefinirVisibilidade(true)
+            modoTutorialHandlers = handlers
+        end,
+        desativarModoTutorial = function()
+            modoTutorialHandlers = nil
+            HandUI.DefinirFiltroClique(nil)
+            TrucoUI.DefinirInterceptador(nil, nil)
+            TrucoUI.Ocultar(true)
+            TableUI.DefinirModoLateral(false)
+            if not estaSentado then
+                TableUI.DefinirVisivel(false)
+                UIManager.ResetTotal()
+            end
+            LobbyUI.DefinirSentado(estaSentado)
+        end,
+        obterBtnTruco = function() return btnTruco end,
+        definirBtnTruco = function(visivel, texto)
+            if not btnTruco then return end
+            btnTruco.Visible = (visivel == true)
+            if texto then btnTruco.Text = texto end
+        end,
+        obterPainelVira = function() return ScoreUI.ObterPainelVira() end,
+        obterContainerInfo = function() return ScoreUI.ObterContainerInfo() end,
+        obterElementoCarta = function(cardId) return HandUI.ObterElementoCarta(cardId) end,
+        definirFiltroCliqueCarta = function(fn) HandUI.DefinirFiltroClique(fn) end,
+        definirEstadoMao = function(minhaVez, numQueda, truco)
+            eMinhaVez = (minhaVez == true)
+            HandUI.DefinirEstado(minhaVez, numQueda, truco, nil)
+        end,
+        definirVira = function(val, naipe)
+            ScoreUI.DefinirVira(val, naipe, dadosJogador.SkinEquipada or "Padrao", true)
+            HandUI.DefinirVira({ Value = val, Suit = naipe })
+        end,
+        adicionarCartaMao = function(card) HandUI.AdicionarCarta(card) end,
+        limparMao = function() HandUI.Limpar(); UIManager.OcultarOpcoesJogada() end,
+        adicionarCartaMesa = function(nome, val, naipe, escondida)
+            TableUI.AdicionarCarta(nome, val, naipe, escondida, dadosJogador.SkinEquipada or "Padrao")
+        end,
+        limparMesa = function() TableUI.Limpar() end,
+        atualizarPlacar = function(meus, inimigos)
+            ScoreUI.AtualizarPlacar(meus, inimigos)
+            ScoreUI.MostrarPlacar(true)
+        end,
+        atualizarValorRodada = function(val)
+            valorRodadaAtual = tonumber(val) or 1
+            ScoreUI.AtualizarValorRodada(val, true)
+        end,
+        atualizarEstatisticas = function(parceiro, nossas, deles, historico)
+            ScoreUI.AtualizarEstatisticas(parceiro, nossas, deles, true, historico)
+        end,
+        atualizarStatus = function(msg, cor)
+            ScoreUI.AtualizarStatus(msg, 0)
+            if textoCronometro and cor then
+                textoCronometro.TextColor3 = cor
+            end
+        end,
+        mostrarAvisoFuga = function(msg) UIManager.MostrarAvisoFuga(msg) end,
+        mostrarVencedorRodada = function(msg) UIManager.MostrarVencedorRodada(msg) end,
+        mostrarDesafioTruco = function(val, quemPediu, onResposta, respostaPermitida)
+            TableUI.DefinirModoLateral(true)
+            TrucoUI.DefinirInterceptador(onResposta, respostaPermitida)
+            TrucoUI.Mostrar(val, quemPediu, 0, true)
+        end,
+        ocultarDesafioTruco = function()
+            TrucoUI.DefinirInterceptador(nil, nil)
+            TrucoUI.Ocultar(true)
+            TableUI.DefinirModoLateral(false)
+        end,
+        obterBotaoTrucoUI = function(nome) return TrucoUI.ObterBotao(nome) end,
+        obterPainelTrucoUI = function() return TrucoUI.ObterPainel() end,
+        tocarSom = function(nome) SoundManager.Tocar(nome) end,
+        marcarTutorialVisto = marcarTutorialVistoNoServidor,
+        irParaMesaSolo = irParaMesaSolo,
+        abrirSlidesRegras = function() TutorialUI.Mostrar(true) end,
+    })
+end
+
+function UIManager.IniciarPartidaTutorial()
+    if estaSentado then
+        TutorialUI.Mostrar(true)
+        return
+    end
+    TutorialMatch.Iniciar()
+end
+
+function UIManager.MostrarBoasVindasTutorial(ehReabertura)
+    if estaSentado or TutorialMatch.EstaAtivo() then
+        TutorialUI.Mostrar(true)
+        return
+    end
+    TutorialUI.MostrarBoasVindas(ehReabertura)
 end
 
 -- ==========================================
@@ -188,6 +326,7 @@ function UIManager.MostrarOpcoesJogada(botaoCarta, card, container, onJogarCarta
 
     local function criarBotaoOpcao(texto, cor, escondida)
         local btn = Instance.new("TextButton")
+        btn.Name            = escondida and "BtnJogarCoberta" or "BtnJogarAberta"
         btn.Size            = UDim2.new(1, 0, 0.5, -4)
         btn.BackgroundColor3 = cor
         btn.Text            = texto
@@ -203,6 +342,7 @@ function UIManager.MostrarOpcoesJogada(botaoCarta, card, container, onJogarCarta
         btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play() end)
 
         btn.Activated:Connect(function()
+            if btn:GetAttribute("BloqueadoTutorial") then return end
             eMinhaVez = false
             HandUI.DefinirEstado(eMinhaVez, nil, nil, nil)
             if onJogarCartaCallback then onJogarCartaCallback(card.idUnico, escondida) end
@@ -213,6 +353,10 @@ function UIManager.MostrarOpcoesJogada(botaoCarta, card, container, onJogarCarta
 
     criarBotaoOpcao("JOGAR ABERTA",  Color3.fromRGB(39, 174, 96), false)
     criarBotaoOpcao("JOGAR COBERTA", Color3.fromRGB(90, 90, 90),  true)
+
+    if modoTutorialHandlers and modoTutorialHandlers.onOpcoesJogadaAbertas then
+        modoTutorialHandlers.onOpcoesJogadaAbertas(painelOpcoesJogada)
+    end
 end
 
 function UIManager.OcultarOpcoesJogada()
@@ -259,8 +403,17 @@ function UIManager.AtualizarDadosJogador(dados)
     if dados then dadosJogador = dados end
     ShopUI.AtualizarDados(dados)
     HandUI.DefinirEstado(eMinhaVez, nil, nil, dados)
-    if imgViraAtual and imgViraAtual.Parent and viraAtual then
-        CardSettings.AplicarSkinCarta(imgViraAtual, viraAtual.valor, viraAtual.naipe, false, dadosJogador.SkinEquipada or "Padrao")
+    ScoreUI.AtualizarSkinVira(dadosJogador.SkinEquipada or "Padrao")
+
+    if dados and not boasVindasProcessada then
+        boasVindasProcessada = true
+        if dados.TutorialVisto == false then
+            task.delay(0.85, function()
+                if not estaSentado and not TutorialMatch.EstaAtivo() then
+                    TutorialUI.MostrarBoasVindas(false)
+                end
+            end)
+        end
     end
 end
 function UIManager.MostrarPlacar()                 ScoreUI.MostrarPlacar(estaSentado) end
@@ -274,7 +427,8 @@ function UIManager._CriarElementosScore()
     containerInfoScore = Instance.new("Frame")
     containerInfoScore.Name                 = "InfoContainer"
     containerInfoScore.Position             = UDim2.new(0, 72, 0, 60)
-    containerInfoScore.Size                 = UDim2.new(0, 210, 0.5, 0)
+    containerInfoScore.Size                 = UDim2.new(0, 210, 0, 0)
+    containerInfoScore.AutomaticSize        = Enum.AutomaticSize.Y
     containerInfoScore.BackgroundTransparency = 1
     containerInfoScore.Parent               = painelTela
 
@@ -415,7 +569,7 @@ function UIManager._CriarElementosScore()
 
     painelVira = Instance.new("Frame")
     painelVira.Name            = "ViraDisplayFrame"
-    painelVira.Size            = UDim2.new(0, 98, 0, 140)
+    painelVira.Size            = UDim2.new(0, 108, 0, 174)
     painelVira.Position        = UDim2.new(1, -16, 0, 60)
     painelVira.AnchorPoint     = Vector2.new(1, 0)
     painelVira.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
@@ -433,7 +587,7 @@ function UIManager._CriarElementosScore()
         local ehMobile = (vp.Y < 520 or vp.X < 600)
 
         local larguraInfo = ehMobile and 172 or 200
-        containerInfoScore.Size = UDim2.new(0, larguraInfo + 10, 0.5, 0)
+        containerInfoScore.Size = UDim2.new(0, larguraInfo + 10, 0, 0)
         painelEstatisticas.Size = UDim2.new(0, larguraInfo, 0, ehMobile and 64 or 74)
         textoEstatisticas.TextSize = ehMobile and 13 or 14
         textoPlacarJogo.Size = UDim2.new(0, larguraInfo, 0, ehMobile and 38 or 46)
@@ -442,10 +596,10 @@ function UIManager._CriarElementosScore()
         textoValorRodada.TextSize = ehMobile and 15 or 18
 
         if ehMobile then
-            painelVira.Size = UDim2.new(0, 74, 0, 102)
+            painelVira.Size = UDim2.new(0, 82, 0, 134)
             painelVira.Position = UDim2.new(1, -14, 0, 52)
         else
-            painelVira.Size = UDim2.new(0, 98, 0, 140)
+            painelVira.Size = UDim2.new(0, 108, 0, 174)
             painelVira.Position = UDim2.new(1, -16, 0, 60)
         end
     end)
@@ -457,6 +611,7 @@ function UIManager._CriarElementosScore()
         textoEstatisticas  = textoEstatisticas,
         painelEstatisticas = painelEstatisticas,
         painelVira         = painelVira,
+        containerInfoScore = containerInfoScore,
         marcadoresQuedas   = marcadoresQuedas,
     }
 end
@@ -505,6 +660,10 @@ function UIManager._CriarBtnTruco()
     end)
 
     btnTruco.Activated:Connect(function()
+        if modoTutorialHandlers and modoTutorialHandlers.onPedirTruco then
+            modoTutorialHandlers.onPedirTruco()
+            return
+        end
         Eventos.TrucoEvent:FireServer("Request")
         UIManager.PermitirTruco(false)
     end)
@@ -612,15 +771,15 @@ function UIManager._CriarControlesMesa()
         if vp.X < 520 then
             layout.FillDirection = Enum.FillDirection.Vertical
             painelControlesMesa.Size = UDim2.new(0, 42, 0, 86)
-            painelControlesMesa.Position = UDim2.new(1, -14, 0, 162)
+            painelControlesMesa.Position = UDim2.new(1, -14, 0, 194)
         elseif vp.Y < 520 then
             layout.FillDirection = Enum.FillDirection.Horizontal
             painelControlesMesa.Size = UDim2.new(0, 140, 0, 40)
-            painelControlesMesa.Position = UDim2.new(1, -96, 0, 52)
+            painelControlesMesa.Position = UDim2.new(1, -104, 0, 52)
         else
             layout.FillDirection = Enum.FillDirection.Horizontal
             painelControlesMesa.Size = UDim2.new(0, 140, 0, 40)
-            painelControlesMesa.Position = UDim2.new(1, -124, 0, 60)
+            painelControlesMesa.Position = UDim2.new(1, -134, 0, 60)
         end
     end)
 end
@@ -674,7 +833,7 @@ function UIManager._CriarBotoesEmote()
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
         if vp.X < 520 then
-            painelEmotes.Position = UDim2.new(1, -14, 0, 266)
+            painelEmotes.Position = UDim2.new(1, -14, 0, 290)
             painelEmotes.AnchorPoint = Vector2.new(1, 0)
         elseif vp.Y < 520 then
             painelEmotes.Position = UDim2.new(1, -14, 0.58, 0)
@@ -692,45 +851,9 @@ function UIManager.PermitirTruco(permitido)
 end
 
 function UIManager.DefinirVira(val, naipe)
-    if not painelVira then return end
-    for _, filho in ipairs(painelVira:GetChildren()) do
-        if not filho:IsA("UICorner") and not filho:IsA("UIStroke") then filho:Destroy() end
-    end
-
     viraAtual = { valor = val, naipe = naipe }
-    painelVira.Visible = estaSentado
-    local tituloLbl = Instance.new("TextLabel")
-    tituloLbl.Text               = "VIRA"
-    tituloLbl.Size               = UDim2.new(1, 0, 0.18, 0)
-    tituloLbl.BackgroundTransparency = 1
-    tituloLbl.TextColor3         = Color3.fromRGB(255, 215, 0)
-    tituloLbl.Font               = Enum.Font.GothamBlack
-    tituloLbl.TextScaled         = true
-    tituloLbl.Parent             = painelVira
-
-    local imgVira = Instance.new("ImageLabel")
-    imgVira.Size             = UDim2.new(0.72, 0, 0.62, 0)
-    imgVira.Position         = UDim2.new(0.5, 0, 0.5, 0)
-    imgVira.AnchorPoint      = Vector2.new(0.5, 0.5)
-    imgVira.BackgroundTransparency = 1
-    imgVira.Parent           = painelVira
-    local ratio = Instance.new("UIAspectRatioConstraint", imgVira)
-    ratio.AspectRatio = 93 / 133
-    imgViraAtual             = imgVira
-
-    CardSettings.AplicarSkinCarta(imgVira, val, naipe, false, dadosJogador.SkinEquipada or "Padrao")
-
-    local textoCarta = Instance.new("TextLabel")
-    textoCarta.Text               = val .. " " .. naipe
-    textoCarta.Size               = UDim2.new(1, 0, 0.18, 0)
-    textoCarta.Position           = UDim2.new(0, 0, 0.82, 0)
-    textoCarta.BackgroundTransparency = 1
-    textoCarta.TextColor3         = TEXTO_PRIM
-    textoCarta.Font               = Enum.Font.GothamBold
-    textoCarta.TextScaled         = true
-    textoCarta.Parent             = painelVira
-    local constraintCarta = Instance.new("UITextSizeConstraint", textoCarta)
-    constraintCarta.MaxTextSize = 16
+    ScoreUI.DefinirVira(val, naipe, dadosJogador.SkinEquipada or "Padrao", estaSentado or (modoTutorialHandlers ~= nil))
+    HandUI.DefinirVira({ Value = val, Suit = naipe })
 end
 
 function UIManager._CriarMenuAdmin()
@@ -1220,6 +1343,10 @@ end
 
 function UIManager.DefinirSentado(s)
     estaSentado = s
+    if s and TutorialMatch.EstaAtivo() then
+        TutorialMatch.Encerrar()
+    end
+    TutorialUI.DefinirSentado(s)
     LobbyUI.DefinirSentado(s)
     if s then LeaderboardUI.Fechar() end
     if painelEmotes then painelEmotes.Visible = s end
@@ -1245,8 +1372,10 @@ function UIManager.ResetTotal()
     imgViraAtual = nil
     SoundManager.DefinirModoTensao(false)
     TableUI.DefinirModoLateral(false)
+    HandUI.DefinirVira(nil)
     HandUI.Limpar()
     TableUI.Limpar()
+    ScoreUI.LimparVira()
     ScoreUI.DefinirVisibilidade(false)
     ScoreUI.OcultarPlacar()
     ScoreUI.AtualizarStatus("", 0)

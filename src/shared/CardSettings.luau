@@ -14,6 +14,21 @@ local CardSettings = {
         ["J"] = 5, ["K"] = 6, ["A"] = 7, ["2"] = 8, ["3"] = 9 
     },
 
+    -- Metadados de Manilhas (RN-07: Paus/Zap > Copas > Espadas > Ouros)
+    SuitSymbols = {
+        ["Paus"]    = "♣️",
+        ["Copas"]   = "♥️",
+        ["Espadas"] = "♠️",
+        ["Ouros"]   = "♦️",
+    },
+
+    ManilhaInfoPorNaipe = {
+        ["Paus"]    = { Nome = "ZAP",     Selo = "ZAP ♣️",     Ordem = 4, CorTexto = Color3.fromRGB(255, 226, 96)  },
+        ["Copas"]   = { Nome = "COPAS",   Selo = "COPAS ♥️",   Ordem = 3, CorTexto = Color3.fromRGB(255, 130, 145) },
+        ["Espadas"] = { Nome = "ESPADAS", Selo = "ESPADAS ♠️", Ordem = 2, CorTexto = Color3.fromRGB(215, 232, 255) },
+        ["Ouros"]   = { Nome = "OUROS",   Selo = "OUROS ♦️",   Ordem = 1, CorTexto = Color3.fromRGB(255, 190, 120) },
+    },
+
     -- ========================================================
     -- REGISTRO DE SKINS (COLE SEUS IDs AQUI!)
     -- ========================================================
@@ -65,6 +80,29 @@ function CardSettings.AplicarSkinCarta(elementoGUI, valor, naipe, escondida, nom
         elementoGUI.ImageRectSize = Vector2.new(skin.CardWidth, skin.CardHeight)
         elementoGUI.ImageRectOffset = Vector2.new(colunaX * skin.CardWidth, linhaY * skin.CardHeight)
     end
+end
+
+-- [MÉTODO] Calcula o valor da Manilha a partir do valor da Vira (RN-06: 3 gira para 4)
+function CardSettings.ObterValorManilha(valorVira)
+    if not valorVira then return nil end
+    local valor = (type(valorVira) == "table") and (valorVira.Value or valorVira.valor) or valorVira
+    local idx = table.find(CardSettings.Values, valor)
+    if not idx then return nil end
+    return CardSettings.Values[(idx % #CardSettings.Values) + 1]
+end
+
+-- [MÉTODO] Verifica se uma carta é Manilha para a Vira informada
+function CardSettings.EhManilha(valorCarta, valorVira)
+    local valorManilha = CardSettings.ObterValorManilha(valorVira)
+    return valorManilha ~= nil and valorCarta == valorManilha
+end
+
+-- [MÉTODO] Retorna metadados da Manilha (Selo, Nome, Ordem, CorTexto) se a carta for Manilha
+function CardSettings.ObterInfoManilha(valorCarta, naipeCarta, valorVira)
+    if not CardSettings.EhManilha(valorCarta, valorVira) then
+        return nil
+    end
+    return CardSettings.ManilhaInfoPorNaipe[naipeCarta]
 end
 
 return CardSettings

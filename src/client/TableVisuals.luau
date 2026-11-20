@@ -334,9 +334,11 @@ function VisuaisMesa.DefinirMonteEVira(valor, naipe, nomeSkin)
     destaque.OutlineTransparency = 0.25
     destaque.Parent = cartaVira
 
+    local valorManilha = CardSettings.ObterValorManilha(valor)
+
     local tagVira = Instance.new("BillboardGui")
     tagVira.Name = "ViraLabel"
-    tagVira.Size = UDim2.new(1.05, 0, 0.34, 0)
+    tagVira.Size = UDim2.new(1.75, 0, 0.36, 0)
     tagVira.StudsOffset = Vector3.new(0, 0.56, 0)
     tagVira.AlwaysOnTop = false
     tagVira.MaxDistance = 40
@@ -346,7 +348,7 @@ function VisuaisMesa.DefinirMonteEVira(valor, naipe, nomeSkin)
     badge.Size = UDim2.new(1, 0, 1, 0)
     badge.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
     badge.BackgroundTransparency = 0.12
-    badge.Text = "VIRA"
+    badge.Text = valorManilha and ("VIRA • Manilha: " .. tostring(valorManilha)) or "VIRA"
     badge.TextColor3 = Color3.fromRGB(255, 220, 75)
     badge.Font = Enum.Font.GothamBlack
     badge.TextScaled = true

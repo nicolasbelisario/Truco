@@ -130,6 +130,9 @@ local function calcularPontuacaoQuickPlay(partida, filtroModo)
 
     if filtroModo == "PvP" and partida.UsaBots then return -1 end
     if filtroModo == "PvE" and not partida.UsaBots then return -1 end
+    if (filtroModo == "PvE_Solo" or filtroModo == "MesaPvE_Solo") and partida.TipoMesa ~= "MesaPvE_Solo" then
+        return -1
+    end
 
     local humanos = partida:ContarHumanos()
     local ocupados = partida:ContarJogadores()
@@ -171,6 +174,7 @@ function GerenciadorMesas.ExecutarQuickPlay(jogador, filtroModo)
 
     local melhorPartida = nil
     local melhorPontuacao = -1
+    local usouFallbackSolo = false
 
     for _, partida in ipairs(listaMesasOrdenada) do
         if partida ~= mesaAtual then
@@ -178,6 +182,20 @@ function GerenciadorMesas.ExecutarQuickPlay(jogador, filtroModo)
             if pontuacao > melhorPontuacao then
                 melhorPontuacao = pontuacao
                 melhorPartida = partida
+            end
+        end
+    end
+
+    -- Se pediu MesaPvE_Solo e todas as Solo estiverem ocupadas, tenta outra PvE disponível como fallback
+    if not melhorPartida and (filtroModo == "PvE_Solo" or filtroModo == "MesaPvE_Solo") then
+        for _, partida in ipairs(listaMesasOrdenada) do
+            if partida ~= mesaAtual then
+                local pontuacao = calcularPontuacaoQuickPlay(partida, "PvE")
+                if pontuacao > melhorPontuacao then
+                    melhorPontuacao = pontuacao
+                    melhorPartida = partida
+                    usouFallbackSolo = true
+                end
             end
         end
     end
@@ -190,6 +208,9 @@ function GerenciadorMesas.ExecutarQuickPlay(jogador, filtroModo)
     end
 
     local ok, msg = melhorPartida:SentarJogadorNoAssento(jogador, nil, nil)
+    if ok and usouFallbackSolo then
+        msg = "Mesas Solo ocupadas — você entrou em " .. melhorPartida:ObterNomeExibicao() .. "!"
+    end
     return {
         Sucesso = ok,
         Mensagem = msg,

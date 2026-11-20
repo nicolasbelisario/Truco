@@ -8,6 +8,11 @@
 ## [Não Lançado]
 
 ### Implementado / Corrigido
+- 🎓 **Onboarding de 1ª Sessão, Destaque Automático de Manilhas & Partida Tutorial Scriptada ([Issue #8](https://github.com/nicolasbelisario/Truco/issues/8))**:
+  - **Destaque Automático de Manilhas (`CardSettings.luau`, `HandUI.luau`, `ScoreUI.luau`, `TableVisuals.luau`)**: cálculo unificado de Manilhas em `CardSettings`; `HandUI` aplica automaticamente borda brilhante dourada pulsante + selos (`ZAP ♣️`, `COPAS ♥️`, `ESPADAS ♠️`, `OUROS ♦️`) em tempo real; `ScoreUI` exibe badge clara `"Manilha: X"` logo abaixo da Vira (e na tag 3D da mesa).
+  - **Persistência `TutorialVisto` (`DataManager.luau`, `default.project.json`)**: flag `TutorialVisto` adicionada ao schema `TrucoData_v1` com auto-migração não-intrusiva para veteranos (`PartidasJogadas > 0`), sincronizada via `TutorialEvent`.
+  - **Prompt de Boas-Vindas & Guia `copinhodecocacola` (`GuideAvatar.luau`, `TutorialUI.luau`)**: na 1ª entrada exibe modal *"Gostaria de aprender a jogar?"* com a personagem `Workspace.Tutorial.copinhodecocacola` em `ViewportFrame` 3D, opção discreta de **"Pular Tutorial"**, guia em slides (com atalho **"🤖 TESTAR NA MESA SOLO"** no último slide) e acesso à partida guiada.
+  - **Partida Tutorial Scriptada Interativa (`TutorialMatch.luau`, `UIManager.luau`, `TrucoUI.luau`, `TableManager.luau`)**: 2 mãos scriptadas contra bots com highlights pulsantes, explicações curtas da guia `copinhodecocacola` no cantinho, identificação de Manilhas, jogada de cartas, grito de `TRUCO!` e retruco de `SEIS!`, totalmente isolada do servidor e com filtro `PvE_Solo` no QuickPlay.
 - 🚀 **Onboarding Rápido ("Jogar Agora"), Matchmaking PvP, ProximityPrompts & Bot Anti-Abandono ([Issue #2](https://github.com/nicolasbelisario/Truco/issues/2) / `UC-15`)**:
   - **Botão "▶ JOGAR AGORA" (Quick Play) & Painel de Salas (`LobbyUI.luau`)**: barra inferior no lobby com Quick Play prioritário (PvP 3/4 > 2/4 > 1/4 > PvE com espera > Solo 1v3 > demais) e modal `"🃏 SALAS"` com filtros (`Todas`, `PvP Públicas`, `PvE`), entrada por código e criação de salas públicas/privadas com auto-início ao atingir 4 jogadores.
   - **`ProximityPrompt` nas Cadeiras + `BillboardGui` Dinâmico (`Match.luau`)**: `Seat.CanTouch = false` elimina sentar por esbarrão, `ProximityPrompt` (`"Sentar na Mesa"`) nas cadeiras livres e `BillboardStatusMesa` acima de `Mesa.Topo` exibindo modo (`SOLO 1v3`, `DUPLA 2v2`, `TRIO 3v1`, `PVP 4P`), vagas (`2/4`) e placar ao vivo (`7 x 4`).
@@ -36,7 +41,6 @@
 - Sinais clássicos de Truco, chat rápido seguro e animações de mesa ([Issue #4](https://github.com/nicolasbelisario/Truco/issues/4))
 - Meta-Progressão: Conquistas, Missões Diárias, Daily Login e Win Streak ([Issue #5](https://github.com/nicolasbelisario/Truco/issues/5))
 - Modo Truco Mineiro / Variantes de Regras ([Issue #6](https://github.com/nicolasbelisario/Truco/issues/6))
-- Onboarding: Destaque de Manilhas na mão e Tutorial na 1ª sessão ([Issue #8](https://github.com/nicolasbelisario/Truco/issues/8))
 - Partidas Privadas com Convite de Amigos ([Issue #9](https://github.com/nicolasbelisario/Truco/issues/9))
 - Controle unificado de BGM/SFX (`D-04`), sliders de volume e novos SFX ([Issue #10](https://github.com/nicolasbelisario/Truco/issues/10))
 - Imersão Tabletop 3D: unificar `TableUI`/`TableVisuals`, monte/Vira 3D e mão em leque ([Issue #13](https://github.com/nicolasbelisario/Truco/issues/13))

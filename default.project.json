@@ -18,6 +18,7 @@
         "ShopActionEvent": { "$className": "RemoteEvent" },
         "AdminActionEvent": { "$className": "RemoteEvent" },
         "MatchmakingEvent": { "$className": "RemoteEvent" },
+        "TutorialEvent": { "$className": "RemoteEvent" },
         "GetLeaderboardData": { "$className": "RemoteFunction" },
         "GetRoomsData": { "$className": "RemoteFunction" }
       },

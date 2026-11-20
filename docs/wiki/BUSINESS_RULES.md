@@ -87,7 +87,7 @@
 | **RN-09** | Os termos **"aposta"**, **"gambling"**, **"bet"** e **"stake"** são **proibidos** em textos visíveis ao jogador, configs e código (variáveis/comentários). | Validado por `validate_configs.py` |
 | **RN-35** | O estado canônico da partida deve ser mantido **exclusivamente no servidor**. | `Match.luau`, `RoundManager.luau`, `TrucoHandler.luau` |
 | **RN-36** | Validação anti-cheat: o servidor verifica se é o turno do jogador e se a carta jogada pertence à sua mão em `MaosJogadores` antes de aceitar. | `RoundManager:JogarCarta()` |
-| **RN-37** | O `DataManager` persiste no DataStore `TrucoData_v1` o perfil: `Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas` e `SkinEquipada`. | `DataManager.luau` |
+| **RN-37** | O `DataManager` persiste no DataStore `TrucoData_v1` o perfil: `Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas`, `SkinEquipada` e `TutorialVisto`. | `DataManager.luau` |
 | **RN-38** | O `LeaderboardManager` sincroniza 3 `OrderedDataStore` globais (`Vitorias`, `Pontos`, `Robux`) via `OnStatChanged` e atualiza o quadro físico `Workspace.LeaderboardBoard`. | `LeaderboardManager.luau`, `LeaderboardUI.luau` |
 | **RN-39** | Ações administrativas (`AdminActionEvent`) exigem validação de `UserId` fixo no servidor. | `AdminManager.luau` |
 

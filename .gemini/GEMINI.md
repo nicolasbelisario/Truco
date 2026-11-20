@@ -50,7 +50,7 @@
 - **Segurança, Persistência & Leaderboard**:
   - `RN-35`: Estado canônico **exclusivamente no servidor**.
   - `RN-36`: Validação anti-cheat de turno e propriedade da carta em `MaosJogadores`.
-  - `RN-37`: Schema DataStore `TrucoData_v1` (`Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas`, `SkinEquipada`).
+  - `RN-37`: Schema DataStore `TrucoData_v1` (`Pontos`, `Vitorias`, `Derrotas`, `PartidasJogadas`, `RobuxGasto`, `SkinsCompradas`, `SkinEquipada`, `TutorialVisto`).
   - `RN-38`: 3 `OrderedDataStore` em `LeaderboardManager.luau` + quadro físico 3D `Workspace.LeaderboardBoard`.
   - `RN-39`: `AdminManager.luau` valida `UserId` no servidor.
 
@@ -73,7 +73,7 @@ Mapeamento definido em [default.project.json](../default.project.json):
   - `Utils/`: `DeckManager.luau`, `RuleManager.luau`, `AvatarManager.luau`.
 - **Client (`StarterPlayer.StarterPlayerScripts.Client` → `src/client/`)**:
   - Entrada & Mundo 3D: `init.client.luau`, `TableVisuals.luau`.
-  - `UI/`: `UIManager.luau`, `HandUI.luau`, `TableUI.luau`, `TrucoUI.luau`, `ScoreUI.luau`, `ShopUI.luau`, `LeaderboardUI.luau`, `LobbyUI.luau`, `TutorialUI.luau`, `AudioUI.luau`, `CameraManager.luau`, `SoundManager.luau`.
+  - `UI/`: `UIManager.luau`, `HandUI.luau`, `TableUI.luau`, `TrucoUI.luau`, `ScoreUI.luau`, `ShopUI.luau`, `LeaderboardUI.luau`, `LobbyUI.luau`, `TutorialUI.luau`, `TutorialMatch.luau`, `GuideAvatar.luau`, `AudioUI.luau`, `CameraManager.luau`, `SoundManager.luau`.
 
 ---
 
@@ -92,6 +92,7 @@ Mapeamento definido em [default.project.json](../default.project.json):
   - `SyncDataEvent` (S→C: `dados`)
   - `AdminActionEvent` (C→S: `"Adicionar" | "Remover", alvoNome, quantidadeStr`)
   - `MatchmakingEvent` (Bidirecional: `"QuickPlay" | "EntrarMesa" | "EntrarPorCodigo" | "CriarSala"` / `"QuickPlayResult" | "RoomListUpdate"`)
+  - `TutorialEvent` (C→S: `"MarcarVisto"`)
 - **RemoteFunctions**:
   - `GetLeaderboardData` (C→S: `categoria: "Vitorias" | "Pontos" | "Robux"`)
   - `GetRoomsData` (C→S: lista de salas e status ao vivo)

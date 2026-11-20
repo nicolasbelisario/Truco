@@ -141,5 +141,27 @@ class TestTrucoCoreRules(unittest.TestCase):
         vencedor = determinar_vencedor_queda(jogadas, vira)
         self.assertEqual(vencedor, "DRAW")
 
+    def test_destaque_manilha_selos_issue8(self):
+        """Identifica corretamente Manilhas para destaque em HandUI/ScoreUI (Issue #8)."""
+        selos = {
+            "Paus": "ZAP ♣️",
+            "Copas": "COPAS ♥️",
+            "Espadas": "ESPADAS ♠️",
+            "Ouros": "OUROS ♦️",
+        }
+        vira = "5"
+        manilha = obter_manilha_de_vira(vira)
+        self.assertEqual(manilha, "6")
+
+        mao = [("6", "Paus"), ("3", "Copas"), ("4", "Espadas")]
+        destaques = [selos[naipe] for val, naipe in mao if val == manilha]
+        self.assertEqual(destaques, ["ZAP ♣️"])
+
+        # Rotação 3 -> 4
+        self.assertEqual(obter_manilha_de_vira("3"), "4")
+        destaques_rot = [selos[naipe] for val, naipe in mao if val == obter_manilha_de_vira("3")]
+        self.assertEqual(destaques_rot, ["ESPADAS ♠️"])
+
+
 if __name__ == "__main__":
     unittest.main()

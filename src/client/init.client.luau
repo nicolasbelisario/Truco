@@ -394,6 +394,14 @@ Eventos.SyncDataEvent.OnClientEvent:Connect(function(dados)
     GerenciadorUI.AtualizarDadosJogador(dados)
 end)
 
+-- Garante sincronização inicial mesmo se o servidor tiver disparado antes do cliente conectar
+task.spawn(function()
+    local tutorialEv = Eventos:WaitForChild("TutorialEvent", 10)
+    if tutorialEv then
+        tutorialEv:FireServer("SolicitarSync")
+    end
+end)
+
 -- ==========================================
 -- SINAIS (EMOTES) E INPUTS
 -- ==========================================
@@ -435,7 +443,7 @@ local function conectarPromptTutorial(inst)
         promptsConectados[inst] = true
         inst.Triggered:Connect(function(quemAtivou)
             if quemAtivou == jogadorLocal then
-                GerenciadorUI.MostrarTutorial(true)
+                GerenciadorUI.MostrarBoasVindasTutorial(true)
             end
         end)
     end

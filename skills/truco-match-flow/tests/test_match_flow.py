@@ -291,6 +291,8 @@ class TestTrucoMatchFlow(unittest.TestCase):
             return -1
         if filtro_modo == "PvE" and not mesa["usa_bots"]:
             return -1
+        if filtro_modo in ("PvE_Solo", "MesaPvE_Solo") and mesa.get("tipo_mesa") != "MesaPvE_Solo":
+            return -1
 
         humanos = mesa["humanos"]
         ocupados = mesa["ocupados"]
@@ -381,6 +383,33 @@ class TestTrucoMatchFlow(unittest.TestCase):
         humanos_restantes = [p for p in assentos.values() if not p["bot"]]
         deve_resetar = len(humanos_restantes) == 0
         self.assertTrue(deve_resetar)
+
+    # --- Testes de Onboarding 1ª Sessão & Atalho MesaPvE_Solo (Issue #8) ---
+
+    def _carregar_flag_tutorial_visto(self, dados_salvos):
+        d = dados_salvos or {}
+        partidas = d.get("PartidasJogadas", 0)
+        return (d.get("TutorialVisto") is True) or (d.get("TutorialVisto") is None and partidas > 0)
+
+    def test_onboarding_tutorial_visto_novo_vs_veterano(self):
+        """Novo jogador vê onboarding; veterano com partidas anteriores ou quem pulou não recebe pop-up intrusivo."""
+        # Jogador novo (sem dados no DataStore)
+        self.assertFalse(self._carregar_flag_tutorial_visto(None))
+        self.assertFalse(self._carregar_flag_tutorial_visto({}))
+        # Veterano migrado de antes da Issue #8 (PartidasJogadas > 0, TutorialVisto ausente)
+        self.assertTrue(self._carregar_flag_tutorial_visto({"PartidasJogadas": 5}))
+        # Jogador que pulou/concluiu o tutorial
+        self.assertTrue(self._carregar_flag_tutorial_visto({"PartidasJogadas": 0, "TutorialVisto": True}))
+
+    def test_quick_play_atalho_mesa_pve_solo(self):
+        """Atalho do tutorial seleciona especificamente uma MesaPvE_Solo livre."""
+        mesas = [
+            {"nome": "Mesa1", "tipo_mesa": "PvP", "estado": "WAITING", "usa_bots": False, "humanos": 3, "ocupados": 3},
+            {"nome": "MesaPvE_Dupla_1", "tipo_mesa": "MesaPvE_Dupla", "estado": "WAITING", "usa_bots": True, "qtd_bots": 2, "humanos": 1, "ocupados": 3},
+            {"nome": "MesaPvE_Solo_1", "tipo_mesa": "MesaPvE_Solo", "estado": "WAITING", "usa_bots": True, "qtd_bots": 3, "humanos": 0, "ocupados": 3},
+        ]
+        melhor = max(mesas, key=lambda m: self._pontuar_quick_play(m, filtro_modo="PvE_Solo"))
+        self.assertEqual(melhor["nome"], "MesaPvE_Solo_1")
 
 
 if __name__ == "__main__":

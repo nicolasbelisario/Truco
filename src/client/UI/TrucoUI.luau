@@ -16,6 +16,10 @@ local TEXTO_PRIM = Color3.new(1, 1, 1)
 local TEXTO_SEC  = Color3.fromRGB(180, 180, 190)
 
 local painelDesafio, barraTempoDesafio
+local interceptadorResposta = nil -- function(resposta) usada apenas durante partida tutorial
+local filtroRespostaPermitida = nil -- string opcional ("Aceitar" | "Correr" | "Aumentar")
+local tweenBarraDesafio = nil
+local botoesPorResposta = {}
 
 -- (D) Inversão de dependência: CameraManager é injetado, não instanciado aqui
 function TrucoUI.Inicializar(painelTela, camManager)
@@ -134,10 +138,19 @@ function TrucoUI._CriarPainel(pai)
         tsConstraint.MaxTextSize = 18
 
         btn.Activated:Connect(function()
+            if filtroRespostaPermitida and resposta ~= filtroRespostaPermitida then
+                return
+            end
+            if interceptadorResposta then
+                interceptadorResposta(resposta)
+                return
+            end
             status.Text         = "Aguardando Parceiro..."
             btn.BackgroundColor3 = BG_BOTAO
             Eventos.TrucoEvent:FireServer("Response", resposta)
         end)
+
+        botoesPorResposta[resposta] = btn
     end
 
     criarBotao("DESCER",   VERDE,    "Aceitar",  "AceitarBtn")
@@ -145,12 +158,33 @@ function TrucoUI._CriarPainel(pai)
     criarBotao("AUMENTAR", AMARELO,  "Aumentar", "AumentarBtn")
 end
 
-function TrucoUI.Mostrar(valor, quemPediu, tempoLimite)
+function TrucoUI.DefinirInterceptador(callback, respostaPermitida)
+    interceptadorResposta = callback
+    filtroRespostaPermitida = respostaPermitida
+    for resp, btn in pairs(botoesPorResposta) do
+        if btn and btn.Parent then
+            local bloqueado = (respostaPermitida ~= nil and resp ~= respostaPermitida)
+            btn.BackgroundTransparency = bloqueado and 0.55 or 0
+            btn.TextTransparency = bloqueado and 0.4 or 0
+        end
+    end
+end
+
+function TrucoUI.ObterBotao(nome)
+    if not painelDesafio then return nil end
+    return painelDesafio:FindFirstChild(nome, true)
+end
+
+function TrucoUI.ObterPainel()
+    return painelDesafio
+end
+
+function TrucoUI.Mostrar(valor, quemPediu, tempoLimite, semCameraTensao)
     local titulo   = painelDesafio:FindFirstChild("Title")
     local status   = painelDesafio:FindFirstChild("Status")
-    local btnAceit = painelDesafio:FindFirstChild("AceitarBtn")
-    local btnCorr  = painelDesafio:FindFirstChild("CorrerBtn")
-    local btnAum   = painelDesafio:FindFirstChild("AumentarBtn")
+    local btnAceit = painelDesafio:FindFirstChild("AceitarBtn", true)
+    local btnCorr  = painelDesafio:FindFirstChild("CorrerBtn", true)
+    local btnAum   = painelDesafio:FindFirstChild("AumentarBtn", true)
 
     if titulo   then titulo.Text  = quemPediu .. " PEDIU " .. valor .. "!" end
     if status   then status.Text  = "Decidam juntos!" end
@@ -163,19 +197,38 @@ function TrucoUI.Mostrar(valor, quemPediu, tempoLimite)
         btnAum.Visible = (valor < 12)
     end
 
-    painelDesafio.Visible = true
-    CameraManager.AplicarTensao(quemPediu)
+    -- Reaplica estado visual caso filtroRespostaPermitida esteja ativo
+    TrucoUI.DefinirInterceptador(interceptadorResposta, filtroRespostaPermitida)
 
-    if barraTempoDesafio and tempoLimite and tempoLimite > 0 then
+    painelDesafio.Visible = true
+    if not semCameraTensao then
+        CameraManager.AplicarTensao(quemPediu)
+    end
+
+    if tweenBarraDesafio then
+        tweenBarraDesafio:Cancel()
+        tweenBarraDesafio = nil
+    end
+
+    if barraTempoDesafio then
         barraTempoDesafio.Size = UDim2.new(1, 0, 1, 0)
-        TweenService:Create(barraTempoDesafio, TweenInfo.new(tempoLimite, Enum.EasingStyle.Linear),
-            {Size = UDim2.new(0, 0, 1, 0)}):Play()
+        if tempoLimite and tempoLimite > 0 then
+            tweenBarraDesafio = TweenService:Create(barraTempoDesafio, TweenInfo.new(tempoLimite, Enum.EasingStyle.Linear),
+                {Size = UDim2.new(0, 0, 1, 0)})
+            tweenBarraDesafio:Play()
+        end
     end
 end
 
-function TrucoUI.Ocultar()
+function TrucoUI.Ocultar(semResetCamera)
+    if tweenBarraDesafio then
+        tweenBarraDesafio:Cancel()
+        tweenBarraDesafio = nil
+    end
     if painelDesafio then painelDesafio.Visible = false end
-    CameraManager.Resetar()
+    if not semResetCamera then
+        CameraManager.Resetar()
+    end
 end
 
 function TrucoUI.AtualizarStatus(msg)
